@@ -6,6 +6,7 @@ use std::{cmp::Ordering, time::Instant};
 use colored::*;
 use egg::*;
 
+use crate::io::reader::{read_chompy_rules, read_rules};
 use crate::structs::{ResultStructure, Rule};
 
 // Defining aliases to reduce code.
@@ -61,11 +62,18 @@ impl Analysis<Math> for ConstantFold {
     fn make(egraph: &EGraph, enode: &Math) -> Self::Data {
         let x = |i: &Id| egraph[*i].data.as_ref();
         Some(match enode {
-            Math::Constant(c) => (*c),
-            Math::Add([a, b]) => (x(a)? + x(b)?),
-            Math::Sub([a, b]) => (x(a)? - x(b)?),
-            Math::Mul([a, b]) => (x(a)? * x(b)?),
-            Math::Div([a, b]) if *x(b)? != 0 => (x(a)? / x(b)?),
+            Math::Constant(c) => *c,
+            Math::Add([a, b]) => x(a)? + x(b)?,
+            Math::Sub([a, b]) => x(a)? - x(b)?,
+            Math::Mul([a, b]) => x(a)? * x(b)?,
+            // Math::Div([a, b]) if *x(b)? != 0 => (x(a)? / x(b)?),
+            Math::Div([a, b]) => {
+                if *x(b)? == 0 {
+                    0
+                } else {
+                    x(a)? / x(b)?
+                }
+            }
             Math::Max([a, b]) => std::cmp::max(*x(a)?, *x(b)?),
             Math::Min([a, b]) => std::cmp::min(*x(a)?, *x(b)?),
             Math::Not(a) => {
@@ -285,6 +293,7 @@ pub fn filtered_rules(class: &json::JsonValue) -> Result<Vec<Rewrite>, Box<dyn E
 }
 
 /// takes an class of rules to use then returns the vector of their associated Rewrites
+/// @ninehusky: why is this an i8 if they're using it as a bool...
 #[rustfmt::skip]
 pub fn rules(ruleset_class: i8) -> Vec<Rewrite> {
     let add_rules = crate::rules::add::add();
@@ -312,6 +321,8 @@ pub fn rules(ruleset_class: i8) -> Vec<Rewrite> {
                 &mul_rules[..],
                 &sub_rules[..],
             ].concat(),
+        // Rules from a file
+        1 => read_chompy_rules(&String::from("chompy-rules.txt").into()).unwrap(),
         //All the rules
         _ => [
             &add_rules[..],

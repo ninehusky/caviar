@@ -4,8 +4,11 @@ use std::fs::File;
 use std::io::Read;
 use std::{env, usize};
 
+use egg::{Applier, Pattern, Rewrite};
+
 use crate::structs::ExpressionStruct;
 use crate::structs::Rule;
+use crate::trs::{ConstantFold, Math};
 
 /// Reads expressions from a csv file into an ExpressionStruct Vector.
 #[allow(dead_code)]
@@ -66,6 +69,81 @@ pub fn read_rules(file_path: &OsString) -> Result<Vec<Rule>, Box<dyn Error>> {
         rules_vect.push(Rule::new(index, lhs, rhs, Some(condition)))
     }
     return Ok(rules_vect);
+}
+
+/// Reads the rules in the format that Ruler outputs.
+pub fn read_chompy_rules(
+    file_path: &OsString,
+) -> Result<Vec<Rewrite<Math, ConstantFold>>, Box<dyn Error>> {
+    // open the file
+    pub fn from_string(
+        s: &str,
+    ) -> Result<
+        (
+            Rewrite<Math, ConstantFold>,
+            Option<Rewrite<Math, ConstantFold>>,
+        ),
+        String,
+    > {
+        let make_name =
+            |lhs: &Pattern<Math>, rhs: &Pattern<Math>, cond: Option<Pattern<Math>>| -> String {
+                match cond {
+                    None => format!("{} ==> {}", lhs, rhs),
+                    Some(cond) => format!("{} ==> {} if {}", lhs, rhs, cond),
+                }
+            };
+
+        let (s, cond) = {
+            if let Some((l, r)) = s.split_once(" if ") {
+                let cond: Pattern<Math> = r.parse().unwrap();
+                (l, Some(cond))
+            } else {
+                (s, None)
+            }
+        };
+        if let Some((l, r)) = s.split_once("=>") {
+            let l_pat: Pattern<Math> = l.parse().unwrap();
+            let r_pat: Pattern<Math> = r.parse().unwrap();
+
+            let name = make_name(&l_pat, &r_pat, cond.clone());
+
+            let forwards = if let Some(ref cond) = cond {
+                Rewrite::new(name.clone(), l_pat.clone(), r_pat.clone()).unwrap()
+            } else {
+                Rewrite::new(name.clone(), l_pat.clone(), r_pat.clone()).unwrap()
+            };
+
+            if s.contains("<=>") {
+                let backwards_name = make_name(&r_pat, &l_pat, cond.clone());
+
+                let backwards = if let Some(cond) = cond {
+                    Rewrite::new(backwards_name.clone(), r_pat.clone(), l_pat.clone()).unwrap()
+                } else {
+                    Rewrite::new(backwards_name.clone(), r_pat.clone(), l_pat.clone()).unwrap()
+                };
+
+                Ok((forwards, Some(backwards)))
+            } else {
+                Ok((forwards, None))
+            }
+        } else {
+            Err(format!("Failed to parse {}", s))
+        }
+    }
+    let rules = std::fs::read_to_string(file_path)?;
+    let mut result = vec![];
+    for (i, line) in rules.lines().enumerate() {
+        if line.contains("if") {
+            // just start with total rules.
+            continue;
+        }
+        let (forwards, backwards) = from_string(line).unwrap();
+        result.push(forwards);
+        if let Some(backwards) = backwards {
+            result.push(backwards);
+        }
+    }
+    Ok(result)
 }
 
 ///Gets the nth argument from the command line.
