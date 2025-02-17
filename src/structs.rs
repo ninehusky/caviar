@@ -8,33 +8,33 @@ use serde::Serialize;
 ///The `ResultStructure` type is used to represent the result of proving or simplifying an expression
 pub struct ResultStructure {
     //index of the expression set to make debugging easier
-    index: i32,
+    pub index: i32,
     // The expression to be proved or simplified
-    start_expression: String,
+    pub start_expression: String,
     // The goal to prove
-    end_expression: String,
+    pub end_expression: String,
     // The result of the prover true means we could prove it.
     pub result: bool,
     // The simplest representation extracted
-    best_expr: String,
+    pub best_expr: String,
     //The id of the cluster that was used to prove the expression in case we used clusters
-    class: i64,
+    pub class: i64,
     //Number of iterations used to prove the expression
-    iterations: usize,
+    pub iterations: usize,
     //The size of the egraph used to prove the expression
-    egraph_size: usize,
+    pub egraph_size: usize,
     //The number of rebuilds used to prove the expression
-    rebuilds: usize,
+    pub rebuilds: usize,
     //The time it took to prove the expression
     pub total_time: f64,
     // The reason the execution stopped
-    stop_reason: String,
+    pub stop_reason: String,
     //The condition of the rule
-    condition: Option<String>,
+    pub condition: Option<String>,
     // Halide's result for proving the expression
-    halide_result: String,
+    pub halide_result: String,
     // The time it took halide to prove the expression
-    halide_time: f64,
+    pub halide_time: f64,
 }
 
 impl ResultStructure {

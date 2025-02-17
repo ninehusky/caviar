@@ -71,6 +71,7 @@ fn prove_expressions_chompy(
             report,
         );
         normal_res.add_halide(expression.halide_result.clone(), expression.halide_time);
+        println!("normal result stop reason: {:?}", normal_res.stop_reason);
         println!(
             "normal result: {:?} with time: {}",
             normal_res.result, normal_res.total_time
@@ -84,6 +85,7 @@ fn prove_expressions_chompy(
             report,
         );
         chompy_res.add_halide(expression.halide_result.clone(), expression.halide_time);
+        println!("chompy result stop reason: {:?}", chompy_res.stop_reason);
         println!(
             "chompy result: {:?} with time: {}",
             chompy_res.result, chompy_res.total_time
@@ -91,6 +93,13 @@ fn prove_expressions_chompy(
 
         if normal_res.result != chompy_res.result {
             println!("results are different!");
+            if chompy_res.stop_reason == "Goal 0 Matched"
+                || chompy_res.stop_reason == "Goal 1 Matched"
+            {
+                println!("chompy result is better!");
+            } else {
+                println!("normal result is better!");
+            }
         }
 
         results.push(chompy_res);

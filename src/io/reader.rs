@@ -4,11 +4,14 @@ use std::fs::File;
 use std::io::Read;
 use std::{env, usize};
 
-use egg::{Applier, Pattern, Rewrite};
+use std::str::FromStr;
+
+use egg::{Applier, Condition, ConditionalApplier, ENodeOrVar, Pattern, Rewrite};
+use sexp::{parse, Sexp};
 
 use crate::structs::ExpressionStruct;
 use crate::structs::Rule;
-use crate::trs::{ConstantFold, Math};
+use crate::trs::{compare_c0_c1_chompy, ConstantFold, Math};
 
 /// Reads expressions from a csv file into an ExpressionStruct Vector.
 #[allow(dead_code)]
@@ -75,6 +78,26 @@ pub fn read_rules(file_path: &OsString) -> Result<Vec<Rule>, Box<dyn Error>> {
 pub fn read_chompy_rules(
     file_path: &OsString,
 ) -> Result<Vec<Rewrite<Math, ConstantFold>>, Box<dyn Error>> {
+    println!("Reading rules from {}", file_path.to_str().unwrap());
+    pub fn make_cond(cond: &str) -> impl Condition<Math, ConstantFold> {
+        let cond_ast: Sexp = parse(cond).unwrap();
+        let (cond, e1, e2) = match cond_ast {
+            Sexp::Atom(_) => panic!("expected a list"),
+            Sexp::List(l) => {
+                if l.len() != 3 {
+                    panic!("expected a list of length 3");
+                }
+                (
+                    l[0].clone().to_string(),
+                    l[1].clone().to_string(),
+                    l[2].clone().to_string(),
+                )
+            }
+        };
+
+        compare_c0_c1_chompy(e1.as_str(), e2.as_str(), cond.as_str())
+    }
+
     // open the file
     pub fn from_string(
         s: &str,
@@ -108,7 +131,12 @@ pub fn read_chompy_rules(
             let name = make_name(&l_pat, &r_pat, cond.clone());
 
             let forwards = if let Some(ref cond) = cond {
-                Rewrite::new(name.clone(), l_pat.clone(), r_pat.clone()).unwrap()
+                let conditional_applier = ConditionalApplier {
+                    condition: make_cond(cond.to_string().as_str()),
+                    applier: r_pat.clone(),
+                };
+                let rw = Rewrite::new(name.clone(), l_pat.clone(), conditional_applier).unwrap();
+                rw
             } else {
                 Rewrite::new(name.clone(), l_pat.clone(), r_pat.clone()).unwrap()
             };
@@ -117,7 +145,10 @@ pub fn read_chompy_rules(
                 let backwards_name = make_name(&r_pat, &l_pat, cond.clone());
 
                 let backwards = if let Some(cond) = cond {
-                    Rewrite::new(backwards_name.clone(), r_pat.clone(), l_pat.clone()).unwrap()
+                    panic!(
+                        "Why do we have a bidirectional rule with a condition? {:?}",
+                        cond
+                    );
                 } else {
                     Rewrite::new(backwards_name.clone(), r_pat.clone(), l_pat.clone()).unwrap()
                 };
@@ -133,10 +164,6 @@ pub fn read_chompy_rules(
     let rules = std::fs::read_to_string(file_path)?;
     let mut result = vec![];
     for (i, line) in rules.lines().enumerate() {
-        if line.contains("if") {
-            // just start with total rules.
-            continue;
-        }
         let (forwards, backwards) = from_string(line).unwrap();
         result.push(forwards);
         if let Some(backwards) = backwards {

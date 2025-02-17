@@ -207,6 +207,79 @@ pub fn is_not_zero(var: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
     move |egraph, _, subst| !egraph[subst[var]].nodes.contains(&zero)
 }
 
+/// Eventually, we'll port this to the general `compare_c0_c1`, but we
+/// need to handle things slightly differently given constants.
+pub fn compare_c0_c1_chompy(
+    e1: &str,
+    e2: &str,
+    comp: &str,
+) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
+    // is there a more idiomatic way to do this in Rust?
+    let e1_var: Option<Var> = match e1.parse() {
+        Ok(v) => Some(v),
+        Err(_) => None,
+    };
+    let e2_var: Option<Var> = match e2.parse() {
+        Ok(v) => Some(v),
+        Err(_) => None,
+    };
+    let i1: Option<i64> = match e1.parse() {
+        Ok(c) => Some(c),
+        Err(_) => None,
+    };
+    let i2: Option<i64> = match e2.parse() {
+        Ok(c) => Some(c),
+        Err(_) => None,
+    };
+
+    let f = match comp {
+        "<" => i64::lt,
+        "<=" => i64::le,
+        "!=" => i64::ne,
+        _ => panic!("Unsupported comparison: {}", comp),
+    };
+
+    move |egraph, _, subst| {
+        // find the constant associated with e1.
+        let c1: i64 = match (e1_var, i1) {
+            // if it's a constant, just use that.
+            (Some(_), Some(_)) => panic!("uhh"),
+            (None, Some(c)) => c,
+            (Some(v), None) => {
+                let id = subst[v];
+                let c = egraph[id].nodes.iter().find_map(|n| match n {
+                    Math::Constant(c) => Some(*c),
+                    _ => None,
+                });
+                match c {
+                    Some(c) => c,
+                    None => return false,
+                }
+            }
+            _ => panic!("Why are both e1_var and i1 None?"),
+        };
+        let c2: i64 = match (e2_var, i2) {
+            // if it's a constant, just use that.
+            (Some(_), Some(_)) => panic!("uhh"),
+            (None, Some(c)) => c,
+            (Some(v), None) => {
+                let id = subst[v];
+                let c = egraph[id].nodes.iter().find_map(|n| match n {
+                    Math::Constant(c) => Some(*c),
+                    _ => None,
+                });
+                match c {
+                    Some(c) => c,
+                    None => return false,
+                }
+            }
+            _ => panic!("Why are both e2_var and i2 None?"),
+        };
+
+        f(&c1, &c2)
+    }
+}
+
 /// Compares two constants c0 and c1
 pub fn compare_c0_c1(
     // first constant
