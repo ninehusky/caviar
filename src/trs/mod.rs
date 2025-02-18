@@ -6,6 +6,7 @@ use std::{cmp::Ordering, time::Instant};
 use colored::*;
 use egg::*;
 
+use crate::io::reader::{read_chompy_rules, read_rules};
 use crate::structs::{ResultStructure, Rule};
 
 // Defining aliases to reduce code.
@@ -61,11 +62,18 @@ impl Analysis<Math> for ConstantFold {
     fn make(egraph: &EGraph, enode: &Math) -> Self::Data {
         let x = |i: &Id| egraph[*i].data.as_ref();
         Some(match enode {
-            Math::Constant(c) => (*c),
-            Math::Add([a, b]) => (x(a)? + x(b)?),
-            Math::Sub([a, b]) => (x(a)? - x(b)?),
-            Math::Mul([a, b]) => (x(a)? * x(b)?),
-            Math::Div([a, b]) if *x(b)? != 0 => (x(a)? / x(b)?),
+            Math::Constant(c) => *c,
+            Math::Add([a, b]) => x(a)? + x(b)?,
+            Math::Sub([a, b]) => x(a)? - x(b)?,
+            Math::Mul([a, b]) => x(a)? * x(b)?,
+            // Math::Div([a, b]) if *x(b)? != 0 => (x(a)? / x(b)?),
+            Math::Div([a, b]) => {
+                if *x(b)? == 0 {
+                    0
+                } else {
+                    x(a)? / x(b)?
+                }
+            }
             Math::Max([a, b]) => std::cmp::max(*x(a)?, *x(b)?),
             Math::Min([a, b]) => std::cmp::min(*x(a)?, *x(b)?),
             Math::Not(a) => {
@@ -199,6 +207,71 @@ pub fn is_not_zero(var: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
     move |egraph, _, subst| !egraph[subst[var]].nodes.contains(&zero)
 }
 
+/// Eventually, we'll port this to the general `compare_c0_c1`, but we
+/// need to handle things slightly differently given constants.
+pub fn compare_c0_c1_chompy(
+    e1: &str,
+    e2: &str,
+    comp: &str,
+) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
+    // is there a more idiomatic way to do this in Rust?
+    let e1_var: Option<Var> = match e1.parse() {
+        Ok(v) => Some(v),
+        Err(_) => None,
+    };
+    let e2_var: Option<Var> = match e2.parse() {
+        Ok(v) => Some(v),
+        Err(_) => None,
+    };
+    let i1: Option<i64> = match e1.parse() {
+        Ok(c) => Some(c),
+        Err(_) => None,
+    };
+    let i2: Option<i64> = match e2.parse() {
+        Ok(c) => Some(c),
+        Err(_) => None,
+    };
+
+    let f = match comp {
+        "<" => i64::lt,
+        "<=" => i64::le,
+        "!=" => i64::ne,
+        _ => panic!("Unsupported comparison: {}", comp),
+    };
+
+    move |egraph, _, subst| {
+        // find the constant associated with e1.
+        let c1: i64 = match (e1_var, i1) {
+            // if it's a constant, just use that.
+            (Some(_), Some(_)) => panic!("uhh"),
+            (None, Some(c)) => c,
+            (Some(v), None) => {
+                let id = subst[v];
+                match egraph[id].data {
+                    Some(c) => c,
+                    None => return false,
+                }
+            }
+            _ => panic!("Why are both e1_var and i1 None?"),
+        };
+        let c2: i64 = match (e2_var, i2) {
+            // if it's a constant, just use that.
+            (Some(_), Some(_)) => panic!("uhh"),
+            (None, Some(c)) => c,
+            (Some(v), None) => {
+                let id = subst[v];
+                match egraph[id].data {
+                    Some(c) => c,
+                    None => return false,
+                }
+            }
+            _ => panic!("Why are both e2_var and i2 None?"),
+        };
+
+        f(&c1, &c2)
+    }
+}
+
 /// Compares two constants c0 and c1
 pub fn compare_c0_c1(
     // first constant
@@ -285,6 +358,7 @@ pub fn filtered_rules(class: &json::JsonValue) -> Result<Vec<Rewrite>, Box<dyn E
 }
 
 /// takes an class of rules to use then returns the vector of their associated Rewrites
+/// @ninehusky: why is this an i8 if they're using it as a bool...
 #[rustfmt::skip]
 pub fn rules(ruleset_class: i8) -> Vec<Rewrite> {
     let add_rules = crate::rules::add::add();
@@ -312,6 +386,8 @@ pub fn rules(ruleset_class: i8) -> Vec<Rewrite> {
                 &mul_rules[..],
                 &sub_rules[..],
             ].concat(),
+        // Rules from a file
+        1 => read_chompy_rules(&String::from("chompy-rules.txt").into()).unwrap(),
         //All the rules
         _ => [
             &add_rules[..],
@@ -1643,4 +1719,74 @@ pub fn prove_npp(
         stop_reason,
         None,
     )
+}
+
+pub mod tests {
+    use std::sync::Arc;
+
+    use egg::{rewrite, EGraph};
+
+    use super::{compare_c0_c1_chompy, ConstantFold, Math};
+
+    #[test]
+    pub fn test_chompy_comparators() {
+        let rw =
+            rewrite!("div_by_self"; "(/ ?x ?x)" => "1" if compare_c0_c1_chompy("?x", "0", "!="));
+        let runner = egg::Runner::default()
+            .with_expr(&"(/ x x)".parse().unwrap())
+            .run(&[rw.clone()]);
+
+        let mut extractor = egg::Extractor::new(&runner.egraph, egg::AstSize);
+
+        // right now, the condition should not be met.
+        assert!(extractor.find_best(runner.roots[0]).1.to_string() != "1");
+
+        // now, let's make the value of `x` 3.
+        let mut egraph: EGraph<Math, ConstantFold> = EGraph::default();
+        let x = egraph.add_expr(&"x".parse().unwrap());
+        egraph[x].data = Some(3);
+
+        let root = egraph.add_expr(&"(/ x x)".parse().unwrap());
+
+        let runner = egg::Runner::default()
+            .with_egraph(egraph.clone())
+            .run(&[rw]);
+
+        let mut extractor = egg::Extractor::new(&runner.egraph, egg::AstSize);
+        // now, the condition should be met.
+        assert_eq!(extractor.find_best(root).1.to_string(), "1");
+    }
+
+    #[test]
+    pub fn chompy_neq_equiv_to_caviar() {
+        let mut egraph: EGraph<Math, ConstantFold> = EGraph::default();
+        let x = egraph.add_expr(&"x".parse().unwrap());
+        egraph[x].data = Some(3);
+
+        let root = egraph.add_expr(&"(/ x x)".parse().unwrap());
+
+        // 1. Chompy
+        let runner = egg::Runner::default()
+            .with_egraph(egraph.clone())
+            .run(&[rewrite!(
+                "div_by_self";
+                "(/ ?x ?x)" => "1" if compare_c0_c1_chompy("?x", "0", "!=")
+            )]);
+
+        let mut extractor = egg::Extractor::new(&runner.egraph, egg::AstSize);
+
+        assert_eq!(extractor.find_best(root).1.to_string(), "1");
+
+        // 2. Caviar
+        let iter = crate::rules::div::div().into_iter();
+        let div_cancel_rule = iter.filter(|r| r.name() == "div-cancel").next().unwrap();
+
+        let runner = egg::Runner::default()
+            .with_egraph(egraph.clone())
+            .run(&[div_cancel_rule]);
+
+        let mut extractor = egg::Extractor::new(&runner.egraph, egg::AstSize);
+
+        assert_eq!(extractor.find_best(root).1.to_string(), "1");
+    }
 }

@@ -42,7 +42,67 @@ fn prove_expressions(
             report,
         );
         res.add_halide(expression.halide_result.clone(), expression.halide_time);
+        println!("result: {:?}", res.result);
         results.push(res);
+    }
+    results
+}
+
+fn prove_expressions_chompy(
+    exprs_vect: &Vec<ExpressionStruct>,
+    ruleset_class: i8,
+    params: (usize, usize, f64),
+    use_iteration_check: bool,
+    report: bool,
+) -> Vec<ResultStructure> {
+    //Initialize the results vector.
+    let mut results = Vec::new();
+
+    //For each expression try to prove it then push the results into the results vector.
+    for expression in exprs_vect.iter() {
+        println!("Starting Expression: {}", expression.index);
+        println!("expression is: {}", expression.expression);
+        let mut normal_res = prove(
+            expression.index,
+            &expression.expression,
+            -1,
+            params,
+            use_iteration_check,
+            report,
+        );
+        normal_res.add_halide(expression.halide_result.clone(), expression.halide_time);
+        println!("normal result stop reason: {:?}", normal_res.stop_reason);
+        println!(
+            "normal result: {:?} with time: {}",
+            normal_res.result, normal_res.total_time
+        );
+        let mut chompy_res = prove(
+            expression.index,
+            &expression.expression,
+            1,
+            params,
+            use_iteration_check,
+            report,
+        );
+        chompy_res.add_halide(expression.halide_result.clone(), expression.halide_time);
+        println!("chompy result stop reason: {:?}", chompy_res.stop_reason);
+        println!(
+            "chompy result: {:?} with time: {}",
+            chompy_res.result, chompy_res.total_time
+        );
+
+        if normal_res.result != chompy_res.result {
+            println!("results are different!");
+            if chompy_res.stop_reason == "Goal 0 Matched"
+                || chompy_res.stop_reason == "Goal 1 Matched"
+            {
+                println!("chompy result is better!");
+            } else {
+                println!("normal result is better!");
+            }
+        }
+
+        results.push(chompy_res);
     }
     results
 }
@@ -275,8 +335,8 @@ fn simplify_expressions(
 }
 
 fn main() {
-    let _args: Vec<String> = env::args().collect();
-    if _args.len() > 4 {
+    let args: Vec<String> = env::args().collect();
+    if args.len() > 4 {
         let operation = get_nth_arg(1).unwrap();
         let expressions_file = get_nth_arg(2).unwrap();
         let params = get_runner_params(3).unwrap();
@@ -323,7 +383,14 @@ fn main() {
             // Prove expressions using Caviar with/without ILC
             "prove" => {
                 let expression_vect = read_expressions(&expressions_file).unwrap();
-                let results = prove_expressions(&expression_vect, -1, params, true, false);
+                // hacky
+                let results = if args.iter().last().unwrap() == "--use_chompy_rules" {
+                    println!("we're gonna use chompy rules.");
+                    prove_expressions_chompy(&expression_vect, 1, params, true, false)
+                } else {
+                    // standard caviar.
+                    prove_expressions(&expression_vect, -1, params, true, false)
+                };
                 write_results("tmp/results_prove.csv", &results).unwrap();
             }
             // Prove expressions using Caviar with pulses and with/without ILC.
