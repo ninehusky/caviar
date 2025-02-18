@@ -247,11 +247,7 @@ pub fn compare_c0_c1_chompy(
             (None, Some(c)) => c,
             (Some(v), None) => {
                 let id = subst[v];
-                let c = egraph[id].nodes.iter().find_map(|n| match n {
-                    Math::Constant(c) => Some(*c),
-                    _ => None,
-                });
-                match c {
+                match egraph[id].data {
                     Some(c) => c,
                     None => return false,
                 }
@@ -264,11 +260,7 @@ pub fn compare_c0_c1_chompy(
             (None, Some(c)) => c,
             (Some(v), None) => {
                 let id = subst[v];
-                let c = egraph[id].nodes.iter().find_map(|n| match n {
-                    Math::Constant(c) => Some(*c),
-                    _ => None,
-                });
-                match c {
+                match egraph[id].data {
                     Some(c) => c,
                     None => return false,
                 }
@@ -1727,4 +1719,74 @@ pub fn prove_npp(
         stop_reason,
         None,
     )
+}
+
+pub mod tests {
+    use std::sync::Arc;
+
+    use egg::{rewrite, EGraph};
+
+    use super::{compare_c0_c1_chompy, ConstantFold, Math};
+
+    #[test]
+    pub fn test_chompy_comparators() {
+        let rw =
+            rewrite!("div_by_self"; "(/ ?x ?x)" => "1" if compare_c0_c1_chompy("?x", "0", "!="));
+        let runner = egg::Runner::default()
+            .with_expr(&"(/ x x)".parse().unwrap())
+            .run(&[rw.clone()]);
+
+        let mut extractor = egg::Extractor::new(&runner.egraph, egg::AstSize);
+
+        // right now, the condition should not be met.
+        assert!(extractor.find_best(runner.roots[0]).1.to_string() != "1");
+
+        // now, let's make the value of `x` 3.
+        let mut egraph: EGraph<Math, ConstantFold> = EGraph::default();
+        let x = egraph.add_expr(&"x".parse().unwrap());
+        egraph[x].data = Some(3);
+
+        let root = egraph.add_expr(&"(/ x x)".parse().unwrap());
+
+        let runner = egg::Runner::default()
+            .with_egraph(egraph.clone())
+            .run(&[rw]);
+
+        let mut extractor = egg::Extractor::new(&runner.egraph, egg::AstSize);
+        // now, the condition should be met.
+        assert_eq!(extractor.find_best(root).1.to_string(), "1");
+    }
+
+    #[test]
+    pub fn chompy_neq_equiv_to_caviar() {
+        let mut egraph: EGraph<Math, ConstantFold> = EGraph::default();
+        let x = egraph.add_expr(&"x".parse().unwrap());
+        egraph[x].data = Some(3);
+
+        let root = egraph.add_expr(&"(/ x x)".parse().unwrap());
+
+        // 1. Chompy
+        let runner = egg::Runner::default()
+            .with_egraph(egraph.clone())
+            .run(&[rewrite!(
+                "div_by_self";
+                "(/ ?x ?x)" => "1" if compare_c0_c1_chompy("?x", "0", "!=")
+            )]);
+
+        let mut extractor = egg::Extractor::new(&runner.egraph, egg::AstSize);
+
+        assert_eq!(extractor.find_best(root).1.to_string(), "1");
+
+        // 2. Caviar
+        let iter = crate::rules::div::div().into_iter();
+        let div_cancel_rule = iter.filter(|r| r.name() == "div-cancel").next().unwrap();
+
+        let runner = egg::Runner::default()
+            .with_egraph(egraph.clone())
+            .run(&[div_cancel_rule]);
+
+        let mut extractor = egg::Extractor::new(&runner.egraph, egg::AstSize);
+
+        assert_eq!(extractor.find_best(root).1.to_string(), "1");
+    }
 }
