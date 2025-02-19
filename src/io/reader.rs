@@ -4,14 +4,8 @@ use std::fs::File;
 use std::io::Read;
 use std::{env, usize};
 
-use std::str::FromStr;
-
-use egg::{Applier, Condition, ConditionalApplier, ENodeOrVar, Pattern, Rewrite};
-use sexp::{parse, Sexp};
-
-use crate::structs::ExpressionStruct;
 use crate::structs::Rule;
-use crate::trs::{compare_c0_c1_chompy, ConstantFold, Math};
+use crate::ExpressionStruct;
 
 /// Reads expressions from a csv file into an ExpressionStruct Vector.
 #[allow(dead_code)]
@@ -37,7 +31,7 @@ pub fn read_expressions(file_path: &OsString) -> Result<Vec<ExpressionStruct>, B
             halide_time,
         ))
     }
-    return Ok(expressions_vect);
+    Ok(expressions_vect)
 }
 
 ///Reads the expressions in the format specified for the work done for the paper variant.
@@ -54,7 +48,7 @@ pub fn read_expressions_paper(
         let prefix = record[1].to_string();
         expressions_vect.push((infix, prefix))
     }
-    return Ok(expressions_vect);
+    Ok(expressions_vect)
 }
 
 /// Reads the rules from a CSV file then pareses them into a Rule Vector.
@@ -66,111 +60,12 @@ pub fn read_rules(file_path: &OsString) -> Result<Vec<Rule>, Box<dyn Error>> {
     for result in rdr.records() {
         let record = result?;
         let index: i32 = record[0].parse::<i32>().unwrap();
-        let lhs = (&record[2]).to_string();
-        let rhs = (&record[3]).to_string();
-        let condition = (&record[4]).to_string();
+        let lhs = record[2].to_string();
+        let rhs = record[3].to_string();
+        let condition = record[4].to_string();
         rules_vect.push(Rule::new(index, lhs, rhs, Some(condition)))
     }
-    return Ok(rules_vect);
-}
-
-/// Reads the rules in the format that Ruler outputs.
-pub fn read_chompy_rules(
-    file_path: &OsString,
-) -> Result<Vec<Rewrite<Math, ConstantFold>>, Box<dyn Error>> {
-    println!("Reading rules from {}", file_path.to_str().unwrap());
-    pub fn make_cond(cond: &str) -> impl Condition<Math, ConstantFold> {
-        let cond_ast: Sexp = parse(cond).unwrap();
-        let (cond, e1, e2) = match cond_ast {
-            Sexp::Atom(_) => panic!("expected a list"),
-            Sexp::List(l) => {
-                if l.len() != 3 {
-                    panic!("expected a list of length 3");
-                }
-                (
-                    l[0].clone().to_string(),
-                    l[1].clone().to_string(),
-                    l[2].clone().to_string(),
-                )
-            }
-        };
-
-        compare_c0_c1_chompy(e1.as_str(), e2.as_str(), cond.as_str())
-    }
-
-    // open the file
-    pub fn from_string(
-        s: &str,
-    ) -> Result<
-        (
-            Rewrite<Math, ConstantFold>,
-            Option<Rewrite<Math, ConstantFold>>,
-        ),
-        String,
-    > {
-        let make_name =
-            |lhs: &Pattern<Math>, rhs: &Pattern<Math>, cond: Option<Pattern<Math>>| -> String {
-                match cond {
-                    None => format!("{} ==> {}", lhs, rhs),
-                    Some(cond) => format!("{} ==> {} if {}", lhs, rhs, cond),
-                }
-            };
-
-        let (s, cond) = {
-            if let Some((l, r)) = s.split_once(" if ") {
-                let cond: Pattern<Math> = r.parse().unwrap();
-                (l, Some(cond))
-            } else {
-                (s, None)
-            }
-        };
-        if let Some((l, r)) = s.split_once("=>") {
-            let l_pat: Pattern<Math> = l.parse().unwrap();
-            let r_pat: Pattern<Math> = r.parse().unwrap();
-
-            let name = make_name(&l_pat, &r_pat, cond.clone());
-
-            let forwards = if let Some(ref cond) = cond {
-                let conditional_applier = ConditionalApplier {
-                    condition: make_cond(cond.to_string().as_str()),
-                    applier: r_pat.clone(),
-                };
-                let rw = Rewrite::new(name.clone(), l_pat.clone(), conditional_applier).unwrap();
-                rw
-            } else {
-                Rewrite::new(name.clone(), l_pat.clone(), r_pat.clone()).unwrap()
-            };
-
-            if s.contains("<=>") {
-                let backwards_name = make_name(&r_pat, &l_pat, cond.clone());
-
-                let backwards = if let Some(cond) = cond {
-                    panic!(
-                        "Why do we have a bidirectional rule with a condition? {:?}",
-                        cond
-                    );
-                } else {
-                    Rewrite::new(backwards_name.clone(), r_pat.clone(), l_pat.clone()).unwrap()
-                };
-
-                Ok((forwards, Some(backwards)))
-            } else {
-                Ok((forwards, None))
-            }
-        } else {
-            Err(format!("Failed to parse {}", s))
-        }
-    }
-    let rules = std::fs::read_to_string(file_path)?;
-    let mut result = vec![];
-    for (i, line) in rules.lines().enumerate() {
-        let (forwards, backwards) = from_string(line).unwrap();
-        result.push(forwards);
-        if let Some(backwards) = backwards {
-            result.push(backwards);
-        }
-    }
-    Ok(result)
+    Ok(rules_vect)
 }
 
 ///Gets the nth argument from the command line.
@@ -201,7 +96,7 @@ pub fn get_runner_params(start: usize) -> Result<(usize, usize, f64), Box<dyn Er
         Some(i) => i.into_string().unwrap().parse::<f64>().unwrap(),
     };
 
-    return Ok((iter, nodes, time));
+    Ok((iter, nodes, time))
 }
 
 ///Reads the start and end expressions from the exprs file in the tmp folder (used for quick testing)
@@ -210,5 +105,5 @@ pub fn get_start_end() -> Result<(String, String), Box<dyn Error>> {
     let mut s = String::new();
     file.read_to_string(&mut s)?;
     let v: Vec<&str> = s.split("\n").collect();
-    return Ok((v[0].to_string(), v[1].to_string()));
+    Ok((v[0].to_string(), v[1].to_string()))
 }
