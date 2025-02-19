@@ -1,3 +1,5 @@
+use crate::structs::{ResultStructure, Rule, Ruleset, RulesetTag};
+
 use json::JsonValue;
 use std::error::Error;
 use std::time::Duration;
@@ -5,9 +7,6 @@ use std::{cmp::Ordering, time::Instant};
 
 use colored::*;
 use egg::*;
-
-use crate::io::reader::{read_chompy_rules, read_rules};
-use crate::structs::{ResultStructure, Rule};
 
 // Defining aliases to reduce code.
 pub type EGraph = egg::EGraph<Math, ConstantFold>;
@@ -320,92 +319,12 @@ pub fn compare_c0_c1(
 
 /// Takes a JSON array of rules ids and return the vector of their associated Rewrites
 pub fn filtered_rules(class: &json::JsonValue) -> Result<Vec<Rewrite>, Box<dyn Error>> {
-    let add_rules = crate::rules::add::add();
-    let and_rules = crate::rules::and::and();
-    let andor_rules = crate::rules::andor::andor();
-    let div_rules = crate::rules::div::div();
-    let eq_rules = crate::rules::eq::eq();
-    let ineq_rules = crate::rules::ineq::ineq();
-    let lt_rules = crate::rules::lt::lt();
-    let max_rules = crate::rules::max::max();
-    let min_rules = crate::rules::min::min();
-    let modulo_rules = crate::rules::modulo::modulo();
-    let mul_rules = crate::rules::mul::mul();
-    let not_rules = crate::rules::not::not();
-    let or_rules = crate::rules::or::or();
-    let sub_rules = crate::rules::sub::sub();
-
-    let all_rules: Vec<Rewrite> = [
-        &add_rules[..],
-        &and_rules[..],
-        &andor_rules[..],
-        &div_rules[..],
-        &eq_rules[..],
-        &ineq_rules[..],
-        &lt_rules[..],
-        &max_rules[..],
-        &min_rules[..],
-        &modulo_rules[..],
-        &mul_rules[..],
-        &not_rules[..],
-        &or_rules[..],
-        &sub_rules[..],
-    ]
-    .concat();
+    let ruleset = Ruleset::new(RulesetTag::CaviarAll);
+    let all_rules = ruleset.rules();
     let rules_iter = all_rules.into_iter();
     let rules = rules_iter.filter(|rule| class.contains(rule.name()));
-    return Ok(rules.collect());
-}
-
-/// takes an class of rules to use then returns the vector of their associated Rewrites
-/// @ninehusky: why is this an i8 if they're using it as a bool...
-#[rustfmt::skip]
-pub fn rules(ruleset_class: i8) -> Vec<Rewrite> {
-    let add_rules = crate::rules::add::add();
-    let and_rules = crate::rules::and::and();
-    let andor_rules = crate::rules::andor::andor();
-    let div_rules = crate::rules::div::div();
-    let eq_rules = crate::rules::eq::eq();
-    let ineq_rules = crate::rules::ineq::ineq();
-    let lt_rules = crate::rules::lt::lt();
-    let max_rules = crate::rules::max::max();
-    let min_rules = crate::rules::min::min();
-    let modulo_rules = crate::rules::modulo::modulo();
-    let mul_rules = crate::rules::mul::mul();
-    let not_rules = crate::rules::not::not();
-    let or_rules = crate::rules::or::or();
-    let sub_rules = crate::rules::sub::sub();
-
-    return match ruleset_class {
-        // Class that only contains arithmetic operations' rules
-        0 =>
-            [
-                &add_rules[..],
-                &div_rules[..],
-                &modulo_rules[..],
-                &mul_rules[..],
-                &sub_rules[..],
-            ].concat(),
-        // Rules from a file
-        1 => read_chompy_rules(&String::from("chompy-rules.txt").into()).unwrap(),
-        //All the rules
-        _ => [
-            &add_rules[..],
-            &and_rules[..],
-            &andor_rules[..],
-            &div_rules[..],
-            &eq_rules[..],
-            &ineq_rules[..],
-            &lt_rules[..],
-            &max_rules[..],
-            &min_rules[..],
-            &modulo_rules[..],
-            &mul_rules[..],
-            &not_rules[..],
-            &or_rules[..],
-            &sub_rules[..],
-        ].concat()
-    };
+    let result: Vec<Rewrite> = rules.map(|rule| rule.clone()).collect();
+    return Ok(result);
 }
 
 ///Prints the egraph in an SVG file
@@ -424,19 +343,21 @@ pub fn print_graph(egraph: &EGraph, name: &str) {
 pub fn simplify(
     index: i32,
     start_expression: &str,
-    ruleset_class: i8,
+    ruleset: &Ruleset,
     params: (usize, usize, f64),
     report: bool,
 ) -> ResultStructure {
+    let rules = ruleset.rules();
     //Parse the input expression
     let start: RecExpr<Math> = start_expression.parse().unwrap();
+
     //Initialize the runner and run it.
     let runner = Runner::default()
         .with_iter_limit(params.0)
         .with_node_limit(params.1)
         .with_time_limit(Duration::from_secs_f64(params.2))
         .with_expr(&start)
-        .run(rules(ruleset_class).iter());
+        .run(rules);
 
     //Get the ID of the root eclass.
     let id = runner.egraph.find(*runner.roots.last().unwrap());
@@ -470,7 +391,7 @@ pub fn simplify(
         best_expr.to_string(),
         true,
         best_expr.to_string(),
-        ruleset_class as i64,
+        ruleset.to_string(),
         runner.iterations.len(),
         runner.egraph.total_number_of_nodes(),
         runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
@@ -485,11 +406,12 @@ pub fn simplify(
 pub fn prove_equiv(
     start_expression: &str,
     end_expressions: &str,
-    ruleset_class: i8,
+    ruleset: &Ruleset,
     params: (usize, usize, f64),
     use_iteration_check: bool,
     report: bool,
 ) -> ResultStructure {
+    let rules = ruleset.rules();
     let start: RecExpr<Math> = start_expression.parse().unwrap();
     let end: Pattern<Math> = end_expressions.parse().unwrap();
     let result: bool;
@@ -502,7 +424,7 @@ pub fn prove_equiv(
             .with_node_limit(params.1)
             .with_time_limit(Duration::from_secs_f64(params.2))
             .with_expr(&start)
-            .run_check_iteration(rules(ruleset_class).iter(), &[end.clone()]);
+            .run_check_iteration(rules, &[end.clone()]);
     } else {
         // Initialize a simple runner and run it.
         runner = Runner::default()
@@ -510,7 +432,7 @@ pub fn prove_equiv(
             .with_node_limit(params.1)
             .with_time_limit(Duration::from_secs_f64(params.2))
             .with_expr(&start)
-            .run(rules(ruleset_class).iter());
+            .run(rules);
     }
     // Get the ID of the root eclass.
     let id = runner.egraph.find(*runner.roots.last().unwrap());
@@ -568,7 +490,7 @@ pub fn prove_equiv(
         end_expressions.to_string(),
         result,
         best_expr_string.unwrap_or_default(),
-        ruleset_class as i64,
+        ruleset.to_string(),
         runner.iterations.len(),
         runner.egraph.total_number_of_nodes(),
         runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
@@ -583,11 +505,13 @@ pub fn prove_equiv(
 pub fn prove(
     index: i32,
     start_expression: &str,
-    ruleset_class: i8,
+    ruleset: &Ruleset,
     params: (usize, usize, f64),
     use_iteration_check: bool,
     report: bool,
 ) -> ResultStructure {
+    let rules = ruleset.rules();
+
     //Parse the input expression and the goals
     let start: RecExpr<Math> = start_expression.parse().unwrap();
     let end_1: Pattern<Math> = "1".parse().unwrap();
@@ -613,7 +537,7 @@ pub fn prove(
             .with_node_limit(params.1)
             .with_time_limit(Duration::from_secs_f64(params.2))
             .with_expr(&start)
-            .run_check_iteration(rules(ruleset_class).iter(), &goals);
+            .run_check_iteration(rules, &goals);
     } else {
         // Initialize a simple runner and run it.
         runner = Runner::default()
@@ -621,7 +545,7 @@ pub fn prove(
             .with_node_limit(params.1)
             .with_time_limit(Duration::from_secs_f64(params.2))
             .with_expr(&start)
-            .run(rules(ruleset_class).iter());
+            .run(rules);
     }
     // Get the ID of the root eclass.
     id = runner.egraph.find(*runner.roots.last().unwrap());
@@ -686,7 +610,7 @@ pub fn prove(
         "1/0".to_string(),
         result,
         best_expr.unwrap_or_default(),
-        ruleset_class as i64,
+        ruleset.to_string(),
         runner.iterations.len(),
         runner.egraph.total_number_of_nodes(),
         runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
@@ -700,16 +624,16 @@ pub fn prove(
 #[allow(dead_code)]
 pub fn prove_rule(
     rule: &Rule,
-    ruleset_class: i8,
+    ruleset: &Ruleset,
     params: (usize, usize, f64),
     use_iteration_check: bool,
     report: bool,
 ) -> ResultStructure {
-    //Check the equivalence of the LHS and RHS using the [`prove_equive`] function.
+    //Check the equivalence of the LHS and RHS using the [`prove_equiv`] function.
     let mut result = prove_equiv(
         &rule.lhs,
         &rule.rhs,
-        ruleset_class,
+        ruleset,
         params,
         use_iteration_check,
         report,
@@ -840,7 +764,7 @@ pub fn prove_expression_with_file_classes(
         "1/0".to_string(),
         result,
         best_expr.unwrap_or_default(),
-        proving_class as i64,
+        format!("cluster {}", (proving_class as i64)).to_string(),
         runner.iterations.len(),
         runner.egraph.total_number_of_nodes(),
         runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
@@ -1210,12 +1134,13 @@ macro_rules! write_npp {
 pub fn prove_pulses(
     index: i32,
     start_expression: &str,
-    ruleset_class: i8,
+    ruleset: &Ruleset,
     threshold: f64,
     params: (usize, usize, f64),
     use_iteration_check: bool,
     report: bool,
 ) -> ResultStructure {
+    let rules = ruleset.rules();
     // Parse the start expression and the goals.
     let start: RecExpr<Math> = start_expression.parse().unwrap();
     let end_1: Pattern<Math> = "1".parse().unwrap();
@@ -1278,14 +1203,14 @@ pub fn prove_pulses(
                 .with_node_limit(params.1)
                 .with_time_limit(Duration::from_secs_f64(threshold))
                 .with_expr(&expr)
-                .run_check_iteration(rules(ruleset_class).iter(), &goals);
+                .run_check_iteration(rules, &goals);
         } else {
             runner = Runner::default()
                 .with_iter_limit(params.0)
                 .with_node_limit(params.1)
                 .with_time_limit(Duration::from_secs_f64(threshold))
                 .with_expr(&expr)
-                .run(rules(ruleset_class).iter());
+                .run(rules);
         }
         //Check if the expression is proved.
         id = runner.egraph.find(*runner.roots.last().unwrap());
@@ -1360,7 +1285,7 @@ pub fn prove_pulses(
         "1/0".to_string(),
         result,
         best_expr.unwrap_or_default(),
-        ruleset_class as i64,
+        ruleset.to_string(),
         runner.iterations.len(),
         runner.egraph.total_number_of_nodes(),
         runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
@@ -1420,12 +1345,13 @@ pub fn check_npp(egraph: &EGraph, start_id: Id) -> (bool, String) {
 pub fn prove_pulses_npp(
     index: i32,
     start_expression: &str,
-    ruleset_class: i8,
+    ruleset: &Ruleset,
     threshold: f64,
     params: (usize, usize, f64),
     use_iteration_check: bool,
     report: bool,
 ) -> ResultStructure {
+    let rules = ruleset.rules();
     // Parse the start expression and the goals.
     let start: RecExpr<Math> = start_expression.parse().unwrap();
     let end_1: Pattern<Math> = "1".parse().unwrap();
@@ -1487,7 +1413,7 @@ pub fn prove_pulses_npp(
                 .with_node_limit(params.1)
                 .with_time_limit(Duration::from_secs_f64(threshold))
                 .with_expr(&expr)
-                .run_fast(rules(ruleset_class).iter(), &goals, check_npp);
+                .run_fast(rules, &goals, check_npp);
             runner = temp_runner;
             total_time += impo_time;
         } else {
@@ -1497,7 +1423,7 @@ pub fn prove_pulses_npp(
                 .with_node_limit(params.1)
                 .with_time_limit(Duration::from_secs_f64(threshold))
                 .with_expr(&expr)
-                .run(rules(ruleset_class).iter());
+                .run(rules);
         }
 
         //Check if one of the goals match the root eclass of the egraph.
@@ -1583,7 +1509,7 @@ pub fn prove_pulses_npp(
         "1/0".to_string(),
         result,
         best_expr.unwrap_or_default(),
-        ruleset_class as i64,
+        ruleset.to_string(),
         runner.iterations.len(),
         runner.egraph.total_number_of_nodes(),
         runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
@@ -1598,11 +1524,12 @@ pub fn prove_pulses_npp(
 pub fn prove_npp(
     index: i32,
     start_expression: &str,
-    ruleset_class: i8,
+    ruleset: &Ruleset,
     params: (usize, usize, f64),
     use_iteration_check: bool,
     report: bool,
 ) -> ResultStructure {
+    let rules = ruleset.rules();
     //Parse the start expression and goals then initialize the different used variables.
     let start: RecExpr<Math> = start_expression.parse().unwrap();
     let end_1: Pattern<Math> = "1".parse().unwrap();
@@ -1629,7 +1556,7 @@ pub fn prove_npp(
             .with_node_limit(params.1)
             .with_time_limit(Duration::from_secs_f64(params.2))
             .with_expr(&start)
-            .run_fast(rules(ruleset_class).iter(), &goals, check_npp);
+            .run_fast(rules, &goals, check_npp);
         runner = runner_temp;
         total_time += impo_time;
     } else {
@@ -1639,7 +1566,7 @@ pub fn prove_npp(
             .with_node_limit(params.1)
             .with_time_limit(Duration::from_secs_f64(params.2))
             .with_expr(&start)
-            .run(rules(ruleset_class).iter());
+            .run(rules);
     }
     //Get the id of the  eclass containing the input expression.
     id = runner.egraph.find(*runner.roots.last().unwrap());
@@ -1711,7 +1638,7 @@ pub fn prove_npp(
         "1/0".to_string(),
         result,
         best_expr.unwrap_or_default(),
-        ruleset_class as i64,
+        ruleset.to_string(),
         runner.iterations.len(),
         runner.egraph.total_number_of_nodes(),
         runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
@@ -1721,6 +1648,7 @@ pub fn prove_npp(
     )
 }
 
+#[allow(unused_imports)]
 pub mod tests {
     use std::sync::Arc;
 
