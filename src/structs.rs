@@ -134,8 +134,8 @@ fn read_chompy_rules(
                     condition: make_cond(cond.to_string().as_str()),
                     applier: r_pat.clone(),
                 };
-                let rw = Rewrite::new(name.clone(), l_pat.clone(), conditional_applier).unwrap();
-                rw
+                
+                Rewrite::new(name.clone(), l_pat.clone(), conditional_applier).unwrap()
             } else {
                 Rewrite::new(name.clone(), l_pat.clone(), r_pat.clone()).unwrap()
             };

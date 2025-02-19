@@ -113,7 +113,7 @@ pub fn minimal_set_to_prove(
         println!(
             "{0} rules are needed to prove: {1}",
             format!("{0}", ruleset_minimal.len()).red().bold(),
-            format!("{0}", expression.0.to_string())
+            expression.0.to_string()
                 .bright_green()
                 .bold(),
         );
@@ -146,7 +146,7 @@ pub fn generate_dataset_0_1_par(
     );
     expressions.par_iter().for_each(|expression| {
         minimal_set_to_prove_0_1(
-            &expression,
+            expression,
             ruleset_id,
             params,
             use_iteration_check,
@@ -193,7 +193,7 @@ pub fn minimal_set_to_prove_0_1(
         ruleset.shuffle(&mut rng);
         let mut ruleset_copy: Vec<egg::Rewrite<Math, ConstantFold>>;
         let mut ruleset_minimal: Vec<egg::Rewrite<Math, ConstantFold>>;
-        let ruleset_copy_names: Vec<String>;
+        
         counter = 0;
         ruleset_minimal = ruleset.clone();
         while counter < reorder_count {
@@ -217,7 +217,7 @@ pub fn minimal_set_to_prove_0_1(
                 id = runner.egraph.find(*runner.roots.last().unwrap());
                 matches = goals.iter().all(|goal| {
                     let mat = goal.search_eclass(&runner.egraph, id);
-                    if !mat.is_none() {
+                    if mat.is_some() {
                         proved_goal = goal.to_string();
                     }
                     mat.is_none()
@@ -232,7 +232,7 @@ pub fn minimal_set_to_prove_0_1(
             }
             counter += 1;
         }
-        ruleset_copy_names = ruleset_minimal
+        let ruleset_copy_names: Vec<String> = ruleset_minimal
             .clone()
             .into_iter()
             .map(|rule| rule.name().to_string())
@@ -250,7 +250,7 @@ pub fn minimal_set_to_prove_0_1(
             "Batch #{0}: {1} rules are needed to prove: {2}",
             format!("{0}", batch_number).blue().bold(),
             format!("{0}", ruleset_minimal.len()).red().bold(),
-            format!("{0}", expression.to_string()).bright_green().bold(),
+            expression.to_string().bright_green().bold(),
         );
         // for r in ruleset_copy{
         //     println!(
@@ -261,7 +261,7 @@ pub fn minimal_set_to_prove_0_1(
         println!(
             "Batch #{0}: Could not prove {1}",
             format!("{0}", batch_number).blue().bold(),
-            format!("{0}", expression.to_string()).red().bold()
+            expression.to_string().red().bold()
         );
     }
 }
@@ -311,7 +311,7 @@ pub fn generation_execution(
             }
         }
     }
-    if expressions_vect.len() > 0 {
+    if !expressions_vect.is_empty() {
         generate_dataset_0_1_par(
             &expressions_vect,
             -2,

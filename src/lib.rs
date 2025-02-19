@@ -173,7 +173,7 @@ pub fn prove_clusters(
     count: usize,
     use_iteration_check: bool,
     report: bool,
-) -> () {
+) {
     //Read the clusters from the files generated using Python.
     let mut file = File::open(path).unwrap();
     let mut s = String::new();

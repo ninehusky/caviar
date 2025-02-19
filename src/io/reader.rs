@@ -31,7 +31,7 @@ pub fn read_expressions(file_path: &OsString) -> Result<Vec<ExpressionStruct>, B
             halide_time,
         ))
     }
-    return Ok(expressions_vect);
+    Ok(expressions_vect)
 }
 
 ///Reads the expressions in the format specified for the work done for the paper variant.
@@ -48,7 +48,7 @@ pub fn read_expressions_paper(
         let prefix = record[1].to_string();
         expressions_vect.push((infix, prefix))
     }
-    return Ok(expressions_vect);
+    Ok(expressions_vect)
 }
 
 /// Reads the rules from a CSV file then pareses them into a Rule Vector.
@@ -60,12 +60,12 @@ pub fn read_rules(file_path: &OsString) -> Result<Vec<Rule>, Box<dyn Error>> {
     for result in rdr.records() {
         let record = result?;
         let index: i32 = record[0].parse::<i32>().unwrap();
-        let lhs = (&record[2]).to_string();
-        let rhs = (&record[3]).to_string();
-        let condition = (&record[4]).to_string();
+        let lhs = record[2].to_string();
+        let rhs = record[3].to_string();
+        let condition = record[4].to_string();
         rules_vect.push(Rule::new(index, lhs, rhs, Some(condition)))
     }
-    return Ok(rules_vect);
+    Ok(rules_vect)
 }
 
 ///Gets the nth argument from the command line.
@@ -96,7 +96,7 @@ pub fn get_runner_params(start: usize) -> Result<(usize, usize, f64), Box<dyn Er
         Some(i) => i.into_string().unwrap().parse::<f64>().unwrap(),
     };
 
-    return Ok((iter, nodes, time));
+    Ok((iter, nodes, time))
 }
 
 ///Reads the start and end expressions from the exprs file in the tmp folder (used for quick testing)
@@ -105,5 +105,5 @@ pub fn get_start_end() -> Result<(String, String), Box<dyn Error>> {
     let mut s = String::new();
     file.read_to_string(&mut s)?;
     let v: Vec<&str> = s.split("\n").collect();
-    return Ok((v[0].to_string(), v[1].to_string()));
+    Ok((v[0].to_string(), v[1].to_string()))
 }
