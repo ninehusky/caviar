@@ -13,7 +13,7 @@ use crate::trs::{compare_c0_c1_chompy, ConstantFold, Math};
 /// The `structs` module contains a number of useful structs.
 #[derive(Clone)]
 pub enum RulesetTag {
-    Chompy,
+    Custom(String),
     CaviarAll,
     CaviarOnlyArith,
 }
@@ -41,9 +41,9 @@ impl Ruleset {
     /// takes an class of rules to use then returns the vector of their associated Rewrites
     fn get_rules(ruleset_class: &RulesetTag) -> Vec<Rewrite<Math, ConstantFold>> {
         match ruleset_class {
-            RulesetTag::Chompy => {
-                let file_path = OsString::from("chompy_rules.csv");
-                read_chompy_rules(&file_path).unwrap()
+            RulesetTag::Custom(path) => {
+                let file_path = OsString::from(path);
+                read_custom_rules(&file_path).unwrap()
             }
             RulesetTag::CaviarAll => crate::rules::all_rules(),
             RulesetTag::CaviarOnlyArith => crate::rules::arith_rules(),
@@ -53,8 +53,8 @@ impl Ruleset {
 
 impl ToString for Ruleset {
     fn to_string(&self) -> String {
-        match self.tag {
-            RulesetTag::Chompy => "Chompy".to_string(),
+        match &self.tag {
+            RulesetTag::Custom(s) => s.to_string(),
             RulesetTag::CaviarAll => "CaviarAll".to_string(),
             RulesetTag::CaviarOnlyArith => "CaviarOnlyArith".to_string(),
         }
@@ -63,7 +63,7 @@ impl ToString for Ruleset {
 
 impl From<i8> for Ruleset {
     fn from(value: i8) -> Self {
-        // Observe that you can't construct a `ProvingRules::Chompy` ruleset from this: this is purely
+        // Observe that you can't construct a `ProvingRules::Custom` ruleset from this: this is purely
         // to work with the csvs that exist in the Caviar eval.
         match value {
             0 => Self::new(RulesetTag::CaviarOnlyArith),
@@ -75,7 +75,7 @@ impl From<i8> for Ruleset {
 /// Parses the file, which is in the format that Chompy outputs and returns the corresponding vector of Rewrite
 /// rules. The conditions for the rules are limited to what can be expressed in
 /// `compare_c0_c1_chompy`.
-fn read_chompy_rules(
+fn read_custom_rules(
     file_path: &OsString,
 ) -> Result<Vec<Rewrite<Math, ConstantFold>>, Box<dyn Error>> {
     println!("Reading rules from {}", file_path.to_str().unwrap());
@@ -134,7 +134,7 @@ fn read_chompy_rules(
                     condition: make_cond(cond.to_string().as_str()),
                     applier: r_pat.clone(),
                 };
-                
+
                 Rewrite::new(name.clone(), l_pat.clone(), conditional_applier).unwrap()
             } else {
                 Rewrite::new(name.clone(), l_pat.clone(), r_pat.clone()).unwrap()
