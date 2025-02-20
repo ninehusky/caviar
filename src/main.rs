@@ -17,7 +17,7 @@ fn main() {
     let ruleset: Ruleset = {
         if args.iter().last().unwrap() == "--use_chompy_rules" {
             println!("we're gonna use chompy rules.");
-            Ruleset::new(RulesetTag::Chompy)
+            Ruleset::new(RulesetTag::Custom("chompy-rules.txt".to_string()))
         } else {
             Ruleset::new(RulesetTag::CaviarAll)
         }
