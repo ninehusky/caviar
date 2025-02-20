@@ -22,6 +22,8 @@ pub fn prove_expressions(
     use_iteration_check: bool,
     report: bool,
 ) -> Vec<ResultStructure> {
+    println!("hey");
+
     //Initialize the results vector.
     let mut results = Vec::new();
 
