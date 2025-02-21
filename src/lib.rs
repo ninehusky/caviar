@@ -3,7 +3,7 @@ use std::{ffi::OsString, fs::File, io::Read, time::Instant};
 use io::writer::write_results;
 use std::time::Duration;
 
-use structs::{ExpressionStruct, PaperResult, ResultStructure, Ruleset};
+use structs::{ExpressionStruct, PaperResult, ResultStructure, Ruleset, RulesetTag};
 pub mod dataset;
 pub mod io;
 pub mod rules;
@@ -30,17 +30,52 @@ pub fn prove_expressions(
     //For each expression try to prove it then push the results into the results vector.
     for expression in exprs_vect.iter() {
         println!("Starting Expression: {}", expression.index);
-        let mut res = prove(
+        let mut chompy_res = prove(
             expression.index,
             &expression.expression,
-            ruleset,
+            &Ruleset::new(RulesetTag::Custom("chompy-rules.txt".to_string())),
             params,
             use_iteration_check,
             report,
         );
-        res.add_halide(expression.halide_result.clone(), expression.halide_time);
-        println!("result: {:?}", res.result);
-        results.push(res);
+        let mut caviar_res = prove(
+            expression.index,
+            &expression.expression,
+            &Ruleset::new(RulesetTag::CaviarAll),
+            params,
+            use_iteration_check,
+            report,
+        );
+        chompy_res.add_halide(expression.halide_result.clone(), expression.halide_time);
+        caviar_res.add_halide(expression.halide_result.clone(), expression.halide_time);
+        println!("ground truth: {}", expression.halide_result);
+        println!("chompy_res result: {:?}", chompy_res.stop_reason);
+        println!("caviar_res result: {:?}", caviar_res.stop_reason);
+
+        let ground_truth_str = format!("Goal {} Matched", expression.halide_result);
+
+        if chompy_res.stop_reason.contains("Matched") && chompy_res.stop_reason != ground_truth_str
+        {
+            println!("Chompy is not consistent with Halide.");
+        }
+
+        if caviar_res.stop_reason.contains("Matched") && caviar_res.stop_reason != ground_truth_str
+        {
+            println!("caviar is not consistent with Halide.");
+        }
+
+        if chompy_res.stop_reason.contains("Matched") && !caviar_res.stop_reason.contains("Matched")
+        {
+            println!("Chompy reached a goal while Caviar didn't.");
+        } else if !chompy_res.stop_reason.contains("Matched")
+            && caviar_res.stop_reason.contains("Matched")
+        {
+            println!("Caviar reached a goal while Chompy didn't.");
+        } else {
+            println!("Both are equal.");
+        }
+
+        results.push(chompy_res);
     }
     results
 }
