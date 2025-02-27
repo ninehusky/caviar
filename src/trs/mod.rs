@@ -512,6 +512,17 @@ pub fn prove(
 ) -> ResultStructure {
     let rules = ruleset.rules();
 
+    println!("index: {}", index);
+    println!("start_expression: {}", start_expression);
+    println!("params: {:?}", params);
+    println!("use_iteration_check: {}", use_iteration_check);
+    println!("report: {}", report);
+
+    println!("ruleset:");
+    for r in rules {
+        println!("{}", r.name());
+    }
+
     //Parse the input expression and the goals
     let start: RecExpr<Math> = start_expression.parse().unwrap();
     let end_1: Pattern<Math> = "1".parse().unwrap();
@@ -521,7 +532,7 @@ pub fn prove(
     let runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
-    
+
     let best_expr;
 
     if report {
@@ -657,7 +668,7 @@ pub fn prove_expression_with_file_classes(
     let mut runner: egg::Runner<Math, ConstantFold>;
     let mut rules: Vec<Rewrite>;
     let mut proved_goal_index = 0;
-    
+
     let mut best_expr = Some("".to_string());
     let mut proving_class = -1;
     // First iteration of the runner.
@@ -1440,9 +1451,7 @@ pub fn prove_pulses_npp(
         //Check if the runner saturated or found an NPP
         let dont_continue = match &runner.stop_reason.as_ref().unwrap() {
             StopReason::Saturated => true,
-            StopReason::Other(stop) => {
-                stop.contains("Impossible")
-            }
+            StopReason::Other(stop) => stop.contains("Impossible"),
             _ => false,
         };
 
@@ -1534,7 +1543,7 @@ pub fn prove_npp(
     let runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
-    
+
     let best_expr;
     let mut total_time: f64 = 0.0;
 
