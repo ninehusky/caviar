@@ -39,7 +39,7 @@ pub fn prove_expressions(
             report,
         );
         res.add_halide(expression.halide_result.clone(), expression.halide_time);
-        println!("result: {:?}", res.result);
+        println!("result: {:?}", res.stop_reason);
         results.push(res);
     }
     results
