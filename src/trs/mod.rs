@@ -523,7 +523,7 @@ pub fn prove_with_explanation(
     let mut result = false;
     let mut proved_goal_index = 0;
 
-    let mut explanation_string = String::new();
+    let mut explanation_string = String::from("No explanation available");
 
     let best_expr;
 
