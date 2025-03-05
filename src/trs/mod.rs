@@ -42,15 +42,15 @@ pub struct ConstantFold;
 impl Analysis<Math> for ConstantFold {
     type Data = Option<i64>;
 
-    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> Option<Ordering> {
+    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
         match (a.as_mut(), &b) {
-            (None, None) => Some(Ordering::Equal),
+            (None, None) => DidMerge(false, false),
             (None, Some(_)) => {
                 *a = b;
-                Some(Ordering::Less)
+                DidMerge(true, false)
             }
-            (Some(_), None) => Some(Ordering::Greater),
-            (Some(_), Some(_)) => Some(Ordering::Equal),
+            (Some(_), None) => DidMerge(false, true),
+            (Some(_), Some(_)) => DidMerge(false, false),
         }
         // if a.is_none() && b.is_some() {
         //     *a = b
