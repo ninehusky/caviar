@@ -3,7 +3,7 @@ use crate::structs::{ResultStructure, Rule, Ruleset, RulesetTag};
 use json::JsonValue;
 use std::error::Error;
 use std::time::Duration;
-use std::{cmp::Ordering, time::Instant};
+use std::time::Instant;
 
 use colored::*;
 use egg::*;
@@ -363,7 +363,7 @@ pub fn simplify(
     let id = runner.egraph.find(*runner.roots.last().unwrap());
 
     //Initiate the extractor
-    let mut extractor = Extractor::new(&runner.egraph, AstSize);
+    let extractor = Extractor::new(&runner.egraph, AstSize);
 
     //Extract the best expression
     let (_, best_expr) = extractor.find_best(id);
@@ -443,7 +443,7 @@ pub fn prove_equiv(
 
     // if it doesn't match we extract the best expression of the first expression
     if matches.is_none() {
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let (_, best_expr) = extractor.find_best(id);
         best_expr_string = Some(best_expr.to_string());
 
@@ -573,7 +573,7 @@ pub fn prove(
         best_expr = Some(goals[proved_goal_index].to_string());
     } else {
         // If we couldn't prove the goal, we extract the best expression.
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let now = Instant::now();
         let (_, best_exprr) = extractor.find_best(id);
         let extraction_time = now.elapsed().as_secs_f32();
@@ -725,7 +725,7 @@ pub fn prove_expression_with_file_classes(
             }
             best_expr = Some(goals[proved_goal_index].to_string())
         } else {
-            let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+            let extractor = Extractor::new(&runner.egraph, AstDepth);
             // We want to extract the best expression represented in the
             // same e-class as our initial expression, not from the whole e-graph.
             // Luckily the runner stores the eclass Id where we put the initial expression.
@@ -1181,7 +1181,7 @@ pub fn prove_pulses(
     while !exit {
         if i > 0.0 {
             //Extract the best expression from the egraph.
-            let mut extractor;
+            let extractor;
             extractor = Extractor::new(&(runner.egraph), AstDepth);
 
             //Calculate the extraction time.
@@ -1252,7 +1252,7 @@ pub fn prove_pulses(
         best_expr = Some(goals[proved_goal_index].to_string());
     } else {
         // If we didn't prove anything, then we return the best expression.
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let now = Instant::now();
         let (_, best_exprr) = extractor.find_best(id);
         let extraction_time = now.elapsed().as_secs_f32();
@@ -1392,7 +1392,7 @@ pub fn prove_pulses_npp(
         // Extract the best expression and reinitialize the runner if it's not the first pulse
         if i > 0.0 {
             //Extract the best expression and calculate the extraction time.
-            let mut extractor;
+            let extractor;
             extractor = Extractor::new(&(runner.egraph), AstDepth);
             let now = Instant::now();
             let (_, best_exprr) = extractor.find_best(id);
@@ -1472,7 +1472,7 @@ pub fn prove_pulses_npp(
         best_expr = Some(goals[proved_goal_index].to_string());
     } else {
         //Extract the best expression and calculate the extraction time if we can't prove.
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let now = Instant::now();
         let (_, best_exprr) = extractor.find_best(id);
         let extraction_time = now.elapsed().as_secs_f32();
@@ -1593,7 +1593,7 @@ pub fn prove_npp(
         best_expr = Some(goals[proved_goal_index].to_string());
     } else {
         // If no goal was proved, then we need to extract the best expression
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let now = Instant::now();
         let (_, best_exprr) = extractor.find_best(id);
 
