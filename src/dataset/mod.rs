@@ -178,7 +178,8 @@ pub fn minimal_set_to_prove_0_1(
     let goals = [end_0.clone(), end_1.clone()];
     let mut proved_goal = "0/1".to_string();
     let ruleset = Ruleset::from(ruleset_id);
-    let result = crate::trs::prove(-1, expression, &ruleset, params, true, false);
+    let (result, _) =
+        crate::trs::prove_with_explanation(-1, expression, &ruleset, params, true, false);
     if result.result {
         let mut runner;
         let mut id;

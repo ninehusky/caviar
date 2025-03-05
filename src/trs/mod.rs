@@ -503,14 +503,14 @@ pub fn prove_equiv(
 
 ///Prove an expression to true or false using the given ruleset
 #[allow(dead_code)]
-pub fn prove(
+pub fn prove_with_explanation(
     index: i32,
     start_expression: &str,
     ruleset: &Ruleset,
     params: (usize, usize, f64),
     use_iteration_check: bool,
     report: bool,
-) -> ResultStructure {
+) -> (ResultStructure, String) {
     let rules = ruleset.rules();
 
     //Parse the input expression and the goals
@@ -519,9 +519,11 @@ pub fn prove(
     let end_0: Pattern<Math> = "0".parse().unwrap();
     // Set up the goals we will check for.
     let goals = [end_0.clone(), end_1.clone()];
-    let runner: Runner<Math, ConstantFold>;
+    let mut runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
+
+    let mut explanation_string = String::new();
 
     let best_expr;
 
@@ -543,6 +545,7 @@ pub fn prove(
     } else {
         // Initialize a simple runner and run it.
         runner = Runner::default()
+            .with_explanations_enabled()
             .with_iter_limit(params.0)
             .with_node_limit(params.1)
             .with_time_limit(Duration::from_secs_f64(params.2))
@@ -563,6 +566,13 @@ pub fn prove(
     }
 
     if result {
+        explanation_string = runner
+            .explain_equivalence(
+                &start,
+                &goals[proved_goal_index].to_string().parse().unwrap(),
+            )
+            .get_string();
+
         if report {
             println!(
                 "{}\n{:?}",
@@ -606,19 +616,22 @@ pub fn prove(
         StopReason::Other(reason) => reason,
     };
 
-    ResultStructure::new(
-        index,
-        start_expression.to_string(),
-        "1/0".to_string(),
-        result,
-        best_expr.unwrap_or_default(),
-        ruleset.to_string(),
-        runner.iterations.len(),
-        runner.egraph.total_number_of_nodes(),
-        runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
-        total_time,
-        stop_reason,
-        None,
+    (
+        ResultStructure::new(
+            index,
+            start_expression.to_string(),
+            "1/0".to_string(),
+            result,
+            best_expr.unwrap_or_default(),
+            ruleset.to_string(),
+            runner.iterations.len(),
+            runner.egraph.total_number_of_nodes(),
+            runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
+            total_time,
+            stop_reason,
+            None,
+        ),
+        explanation_string,
     )
 }
 
