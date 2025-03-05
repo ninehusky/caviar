@@ -42,7 +42,7 @@ pub struct ConstantFold;
 impl Analysis<Math> for ConstantFold {
     type Data = Option<i64>;
 
-    fn merge(&self, a: &mut Self::Data, b: Self::Data) -> Option<Ordering> {
+    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> Option<Ordering> {
         match (a.as_mut(), &b) {
             (None, None) => Some(Ordering::Equal),
             (None, Some(_)) => {
@@ -58,7 +58,7 @@ impl Analysis<Math> for ConstantFold {
         // cmp
     }
 
-    fn make(egraph: &EGraph, enode: &Math) -> Self::Data {
+    fn make(egraph: &mut EGraph, enode: &Math) -> Self::Data {
         let x = |i: &Id| egraph[*i].data.as_ref();
         Some(match enode {
             Math::Constant(c) => *c,
@@ -154,7 +154,7 @@ impl Analysis<Math> for ConstantFold {
         let class = &mut egraph[id];
         if let Some(c) = class.data {
             let added = egraph.add(Math::Constant(c));
-            let (id, _did_something) = egraph.union(id, added);
+            egraph.union(id, added);
             // to not prune, comment this out
             egraph[id].nodes.retain(|n| n.is_leaf());
 
@@ -322,7 +322,7 @@ pub fn filtered_rules(class: &json::JsonValue) -> Result<Vec<Rewrite>, Box<dyn E
     let ruleset = Ruleset::new(RulesetTag::CaviarAll);
     let all_rules = ruleset.rules();
     let rules_iter = all_rules.iter();
-    let rules = rules_iter.filter(|rule| class.contains(rule.name()));
+    let rules = rules_iter.filter(|rule| class.contains(rule.name.to_string()));
     let result: Vec<Rewrite> = rules.cloned().collect();
     Ok(result)
 }
@@ -419,12 +419,13 @@ pub fn prove_equiv(
     let best_expr_string;
     // Initialize the runner and run it using the ILC contribution.
     if use_iteration_check {
-        runner = Runner::default()
-            .with_iter_limit(params.0)
-            .with_node_limit(params.1)
-            .with_time_limit(Duration::from_secs_f64(params.2))
-            .with_expr(&start)
-            .run_check_iteration(rules, &[end.clone()]);
+        panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+        // runner = Runner::default()
+        //     .with_iter_limit(params.0)
+        //     .with_node_limit(params.1)
+        //     .with_time_limit(Duration::from_secs_f64(params.2))
+        //     .with_expr(&start)
+        //     .run_check_iteration(rules, &[end.clone()]);
     } else {
         // Initialize a simple runner and run it.
         runner = Runner::default()
@@ -521,7 +522,7 @@ pub fn prove(
     let runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
-    
+
     let best_expr;
 
     if report {
@@ -532,12 +533,13 @@ pub fn prove(
     }
     // Initialize the runner and run it using the ILC contribution.
     if use_iteration_check {
-        runner = Runner::default()
-            .with_iter_limit(params.0)
-            .with_node_limit(params.1)
-            .with_time_limit(Duration::from_secs_f64(params.2))
-            .with_expr(&start)
-            .run_check_iteration(rules, &goals);
+        panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+        // runner = Runner::default()
+        //     .with_iter_limit(params.0)
+        //     .with_node_limit(params.1)
+        //     .with_time_limit(Duration::from_secs_f64(params.2))
+        //     .with_expr(&start)
+        //     .run_check_iteration(rules, &goals);
     } else {
         // Initialize a simple runner and run it.
         runner = Runner::default()
@@ -657,7 +659,7 @@ pub fn prove_expression_with_file_classes(
     let mut runner: egg::Runner<Math, ConstantFold>;
     let mut rules: Vec<Rewrite>;
     let mut proved_goal_index = 0;
-    
+
     let mut best_expr = Some("".to_string());
     let mut proving_class = -1;
     // First iteration of the runner.
@@ -691,7 +693,8 @@ pub fn prove_expression_with_file_classes(
         }
 
         if use_iteration_check {
-            runner = runner.run_check_iteration_id(rules.iter(), &goals, id);
+            panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+            // runner = runner.run_check_iteration_id(rules.iter(), &goals, id);
         } else {
             runner = runner.run(rules.iter());
         }
@@ -1198,12 +1201,13 @@ pub fn prove_pulses(
         }
         //Rerun the ES on the newly extracted expression.
         if use_iteration_check {
-            runner = Runner::default()
-                .with_iter_limit(params.0)
-                .with_node_limit(params.1)
-                .with_time_limit(Duration::from_secs_f64(threshold))
-                .with_expr(&expr)
-                .run_check_iteration(rules, &goals);
+            panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+            // runner = Runner::default()
+            //     .with_iter_limit(params.0)
+            //     .with_node_limit(params.1)
+            //     .with_time_limit(Duration::from_secs_f64(threshold))
+            //     .with_expr(&expr)
+            //     .run_check_iteration(rules, &goals);
         } else {
             runner = Runner::default()
                 .with_iter_limit(params.0)
@@ -1408,14 +1412,16 @@ pub fn prove_pulses_npp(
 
         if use_iteration_check {
             //Reinitialize the runner and run equality saturation using ILC
-            let (temp_runner, impo_time) = Runner::default()
-                .with_iter_limit(params.0)
-                .with_node_limit(params.1)
-                .with_time_limit(Duration::from_secs_f64(threshold))
-                .with_expr(&expr)
-                .run_fast(rules, &goals, check_npp);
-            runner = temp_runner;
-            total_time += impo_time;
+            panic!("You are on the branch with new egg, `run_fast` is not available.");
+            // let (temp_runner, impo_time) = Runner::default()
+            //     .with_iter_limit(params.0)
+            //     .with_node_limit(params.1)
+            //     .with_time_limit(Duration::from_secs_f64(threshold))
+            //     .with_expr(&expr)
+            //     .run_fast(rules, &goals, check_npp);
+
+            // runner = temp_runner;
+            // total_time += impo_time;
         } else {
             //Reinitialize the runner and run equality saturation
             runner = Runner::default()
@@ -1440,9 +1446,7 @@ pub fn prove_pulses_npp(
         //Check if the runner saturated or found an NPP
         let dont_continue = match &runner.stop_reason.as_ref().unwrap() {
             StopReason::Saturated => true,
-            StopReason::Other(stop) => {
-                stop.contains("Impossible")
-            }
+            StopReason::Other(stop) => stop.contains("Impossible"),
             _ => false,
         };
 
@@ -1534,7 +1538,7 @@ pub fn prove_npp(
     let runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
-    
+
     let best_expr;
     let mut total_time: f64 = 0.0;
 
@@ -1547,14 +1551,15 @@ pub fn prove_npp(
     }
     // Enable the use of the iterative check technique
     if use_iteration_check {
-        let (runner_temp, impo_time) = Runner::default()
-            .with_iter_limit(params.0)
-            .with_node_limit(params.1)
-            .with_time_limit(Duration::from_secs_f64(params.2))
-            .with_expr(&start)
-            .run_fast(rules, &goals, check_npp);
-        runner = runner_temp;
-        total_time += impo_time;
+        panic!("You are on the branch with new egg, `run_fast` is not available.");
+        // let (runner_temp, impo_time) = Runner::default()
+        //     .with_iter_limit(params.0)
+        //     .with_node_limit(params.1)
+        //     .with_time_limit(Duration::from_secs_f64(params.2))
+        //     .with_expr(&start)
+        //     .run_fast(rules, &goals, check_npp);
+        // runner = runner_temp;
+        // total_time += impo_time;
     } else {
         //Run simple ES.
         runner = Runner::default()

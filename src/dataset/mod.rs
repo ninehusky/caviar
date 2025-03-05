@@ -99,7 +99,7 @@ pub fn minimal_set_to_prove(
         ruleset_copy_names = ruleset_minimal
             .clone()
             .into_iter()
-            .map(|rule| rule.name().to_string())
+            .map(|rule| rule.name.to_string())
             .rev()
             .collect();
         data_object = object! {
@@ -113,9 +113,7 @@ pub fn minimal_set_to_prove(
         println!(
             "{0} rules are needed to prove: {1}",
             format!("{0}", ruleset_minimal.len()).red().bold(),
-            expression.0.to_string()
-                .bright_green()
-                .bold(),
+            expression.0.to_string().bright_green().bold(),
         );
         // for r in ruleset_minimal{
         //     println!(
@@ -193,7 +191,7 @@ pub fn minimal_set_to_prove_0_1(
         ruleset.shuffle(&mut rng);
         let mut ruleset_copy: Vec<egg::Rewrite<Math, ConstantFold>>;
         let mut ruleset_minimal: Vec<egg::Rewrite<Math, ConstantFold>>;
-        
+
         counter = 0;
         ruleset_minimal = ruleset.clone();
         while counter < reorder_count {
@@ -210,7 +208,8 @@ pub fn minimal_set_to_prove_0_1(
                     .with_expr(&start);
 
                 if use_iteration_check {
-                    runner = runner.run_check_iteration(ruleset_copy.iter(), &goals);
+                    panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+                    // runner = runner.run_check_iteration(ruleset_copy.iter(), &goals);
                 } else {
                     runner = runner.run(ruleset_copy.iter());
                 }
@@ -235,7 +234,7 @@ pub fn minimal_set_to_prove_0_1(
         let ruleset_copy_names: Vec<String> = ruleset_minimal
             .clone()
             .into_iter()
-            .map(|rule| rule.name().to_string())
+            .map(|rule| rule.name.to_string())
             .rev()
             .collect();
         data_object = object! {
