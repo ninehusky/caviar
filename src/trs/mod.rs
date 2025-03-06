@@ -3,7 +3,7 @@ use crate::structs::{ResultStructure, Rule, Ruleset, RulesetTag};
 use json::JsonValue;
 use std::error::Error;
 use std::time::Duration;
-use std::{cmp::Ordering, time::Instant};
+use std::time::Instant;
 
 use colored::*;
 use egg::*;
@@ -42,15 +42,15 @@ pub struct ConstantFold;
 impl Analysis<Math> for ConstantFold {
     type Data = Option<i64>;
 
-    fn merge(&self, a: &mut Self::Data, b: Self::Data) -> Option<Ordering> {
+    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
         match (a.as_mut(), &b) {
-            (None, None) => Some(Ordering::Equal),
+            (None, None) => DidMerge(false, false),
             (None, Some(_)) => {
                 *a = b;
-                Some(Ordering::Less)
+                DidMerge(true, false)
             }
-            (Some(_), None) => Some(Ordering::Greater),
-            (Some(_), Some(_)) => Some(Ordering::Equal),
+            (Some(_), None) => DidMerge(false, true),
+            (Some(_), Some(_)) => DidMerge(false, false),
         }
         // if a.is_none() && b.is_some() {
         //     *a = b
@@ -58,7 +58,7 @@ impl Analysis<Math> for ConstantFold {
         // cmp
     }
 
-    fn make(egraph: &EGraph, enode: &Math) -> Self::Data {
+    fn make(egraph: &mut EGraph, enode: &Math) -> Self::Data {
         let x = |i: &Id| egraph[*i].data.as_ref();
         Some(match enode {
             Math::Constant(c) => *c,
@@ -154,7 +154,7 @@ impl Analysis<Math> for ConstantFold {
         let class = &mut egraph[id];
         if let Some(c) = class.data {
             let added = egraph.add(Math::Constant(c));
-            let (id, _did_something) = egraph.union(id, added);
+            egraph.union(id, added);
             // to not prune, comment this out
             egraph[id].nodes.retain(|n| n.is_leaf());
 
@@ -322,7 +322,7 @@ pub fn filtered_rules(class: &json::JsonValue) -> Result<Vec<Rewrite>, Box<dyn E
     let ruleset = Ruleset::new(RulesetTag::CaviarAll);
     let all_rules = ruleset.rules();
     let rules_iter = all_rules.iter();
-    let rules = rules_iter.filter(|rule| class.contains(rule.name()));
+    let rules = rules_iter.filter(|rule| class.contains(rule.name.to_string()));
     let result: Vec<Rewrite> = rules.cloned().collect();
     Ok(result)
 }
@@ -363,7 +363,7 @@ pub fn simplify(
     let id = runner.egraph.find(*runner.roots.last().unwrap());
 
     //Initiate the extractor
-    let mut extractor = Extractor::new(&runner.egraph, AstSize);
+    let extractor = Extractor::new(&runner.egraph, AstSize);
 
     //Extract the best expression
     let (_, best_expr) = extractor.find_best(id);
@@ -419,12 +419,13 @@ pub fn prove_equiv(
     let best_expr_string;
     // Initialize the runner and run it using the ILC contribution.
     if use_iteration_check {
-        runner = Runner::default()
-            .with_iter_limit(params.0)
-            .with_node_limit(params.1)
-            .with_time_limit(Duration::from_secs_f64(params.2))
-            .with_expr(&start)
-            .run_check_iteration(rules, &[end.clone()]);
+        panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+        // runner = Runner::default()
+        //     .with_iter_limit(params.0)
+        //     .with_node_limit(params.1)
+        //     .with_time_limit(Duration::from_secs_f64(params.2))
+        //     .with_expr(&start)
+        //     .run_check_iteration(rules, &[end.clone()]);
     } else {
         // Initialize a simple runner and run it.
         runner = Runner::default()
@@ -442,7 +443,7 @@ pub fn prove_equiv(
 
     // if it doesn't match we extract the best expression of the first expression
     if matches.is_none() {
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let (_, best_expr) = extractor.find_best(id);
         best_expr_string = Some(best_expr.to_string());
 
@@ -502,14 +503,14 @@ pub fn prove_equiv(
 
 ///Prove an expression to true or false using the given ruleset
 #[allow(dead_code)]
-pub fn prove(
+pub fn prove_with_explanation(
     index: i32,
     start_expression: &str,
     ruleset: &Ruleset,
     params: (usize, usize, f64),
     use_iteration_check: bool,
     report: bool,
-) -> ResultStructure {
+) -> (ResultStructure, String) {
     let rules = ruleset.rules();
 
     //Parse the input expression and the goals
@@ -518,10 +519,12 @@ pub fn prove(
     let end_0: Pattern<Math> = "0".parse().unwrap();
     // Set up the goals we will check for.
     let goals = [end_0.clone(), end_1.clone()];
-    let runner: Runner<Math, ConstantFold>;
+    let mut runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
-    
+
+    let mut explanation_string = String::from("No explanation available");
+
     let best_expr;
 
     if report {
@@ -532,15 +535,17 @@ pub fn prove(
     }
     // Initialize the runner and run it using the ILC contribution.
     if use_iteration_check {
-        runner = Runner::default()
-            .with_iter_limit(params.0)
-            .with_node_limit(params.1)
-            .with_time_limit(Duration::from_secs_f64(params.2))
-            .with_expr(&start)
-            .run_check_iteration(rules, &goals);
+        panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+        // runner = Runner::default()
+        //     .with_iter_limit(params.0)
+        //     .with_node_limit(params.1)
+        //     .with_time_limit(Duration::from_secs_f64(params.2))
+        //     .with_expr(&start)
+        //     .run_check_iteration(rules, &goals);
     } else {
         // Initialize a simple runner and run it.
         runner = Runner::default()
+            .with_explanations_enabled()
             .with_iter_limit(params.0)
             .with_node_limit(params.1)
             .with_time_limit(Duration::from_secs_f64(params.2))
@@ -561,6 +566,13 @@ pub fn prove(
     }
 
     if result {
+        explanation_string = runner
+            .explain_equivalence(
+                &start,
+                &goals[proved_goal_index].to_string().parse().unwrap(),
+            )
+            .get_string();
+
         if report {
             println!(
                 "{}\n{:?}",
@@ -571,7 +583,7 @@ pub fn prove(
         best_expr = Some(goals[proved_goal_index].to_string());
     } else {
         // If we couldn't prove the goal, we extract the best expression.
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let now = Instant::now();
         let (_, best_exprr) = extractor.find_best(id);
         let extraction_time = now.elapsed().as_secs_f32();
@@ -604,19 +616,22 @@ pub fn prove(
         StopReason::Other(reason) => reason,
     };
 
-    ResultStructure::new(
-        index,
-        start_expression.to_string(),
-        "1/0".to_string(),
-        result,
-        best_expr.unwrap_or_default(),
-        ruleset.to_string(),
-        runner.iterations.len(),
-        runner.egraph.total_number_of_nodes(),
-        runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
-        total_time,
-        stop_reason,
-        None,
+    (
+        ResultStructure::new(
+            index,
+            start_expression.to_string(),
+            "1/0".to_string(),
+            result,
+            best_expr.unwrap_or_default(),
+            ruleset.to_string(),
+            runner.iterations.len(),
+            runner.egraph.total_number_of_nodes(),
+            runner.iterations.iter().map(|i| i.n_rebuilds).sum(),
+            total_time,
+            stop_reason,
+            None,
+        ),
+        explanation_string,
     )
 }
 
@@ -657,7 +672,7 @@ pub fn prove_expression_with_file_classes(
     let mut runner: egg::Runner<Math, ConstantFold>;
     let mut rules: Vec<Rewrite>;
     let mut proved_goal_index = 0;
-    
+
     let mut best_expr = Some("".to_string());
     let mut proving_class = -1;
     // First iteration of the runner.
@@ -691,7 +706,8 @@ pub fn prove_expression_with_file_classes(
         }
 
         if use_iteration_check {
-            runner = runner.run_check_iteration_id(rules.iter(), &goals, id);
+            panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+            // runner = runner.run_check_iteration_id(rules.iter(), &goals, id);
         } else {
             runner = runner.run(rules.iter());
         }
@@ -722,7 +738,7 @@ pub fn prove_expression_with_file_classes(
             }
             best_expr = Some(goals[proved_goal_index].to_string())
         } else {
-            let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+            let extractor = Extractor::new(&runner.egraph, AstDepth);
             // We want to extract the best expression represented in the
             // same e-class as our initial expression, not from the whole e-graph.
             // Luckily the runner stores the eclass Id where we put the initial expression.
@@ -1178,7 +1194,7 @@ pub fn prove_pulses(
     while !exit {
         if i > 0.0 {
             //Extract the best expression from the egraph.
-            let mut extractor;
+            let extractor;
             extractor = Extractor::new(&(runner.egraph), AstDepth);
 
             //Calculate the extraction time.
@@ -1198,12 +1214,13 @@ pub fn prove_pulses(
         }
         //Rerun the ES on the newly extracted expression.
         if use_iteration_check {
-            runner = Runner::default()
-                .with_iter_limit(params.0)
-                .with_node_limit(params.1)
-                .with_time_limit(Duration::from_secs_f64(threshold))
-                .with_expr(&expr)
-                .run_check_iteration(rules, &goals);
+            panic!("You are on the branch with new egg, `run_check_iteration` is not available.");
+            // runner = Runner::default()
+            //     .with_iter_limit(params.0)
+            //     .with_node_limit(params.1)
+            //     .with_time_limit(Duration::from_secs_f64(threshold))
+            //     .with_expr(&expr)
+            //     .run_check_iteration(rules, &goals);
         } else {
             runner = Runner::default()
                 .with_iter_limit(params.0)
@@ -1248,7 +1265,7 @@ pub fn prove_pulses(
         best_expr = Some(goals[proved_goal_index].to_string());
     } else {
         // If we didn't prove anything, then we return the best expression.
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let now = Instant::now();
         let (_, best_exprr) = extractor.find_best(id);
         let extraction_time = now.elapsed().as_secs_f32();
@@ -1388,7 +1405,7 @@ pub fn prove_pulses_npp(
         // Extract the best expression and reinitialize the runner if it's not the first pulse
         if i > 0.0 {
             //Extract the best expression and calculate the extraction time.
-            let mut extractor;
+            let extractor;
             extractor = Extractor::new(&(runner.egraph), AstDepth);
             let now = Instant::now();
             let (_, best_exprr) = extractor.find_best(id);
@@ -1408,14 +1425,16 @@ pub fn prove_pulses_npp(
 
         if use_iteration_check {
             //Reinitialize the runner and run equality saturation using ILC
-            let (temp_runner, impo_time) = Runner::default()
-                .with_iter_limit(params.0)
-                .with_node_limit(params.1)
-                .with_time_limit(Duration::from_secs_f64(threshold))
-                .with_expr(&expr)
-                .run_fast(rules, &goals, check_npp);
-            runner = temp_runner;
-            total_time += impo_time;
+            panic!("You are on the branch with new egg, `run_fast` is not available.");
+            // let (temp_runner, impo_time) = Runner::default()
+            //     .with_iter_limit(params.0)
+            //     .with_node_limit(params.1)
+            //     .with_time_limit(Duration::from_secs_f64(threshold))
+            //     .with_expr(&expr)
+            //     .run_fast(rules, &goals, check_npp);
+
+            // runner = temp_runner;
+            // total_time += impo_time;
         } else {
             //Reinitialize the runner and run equality saturation
             runner = Runner::default()
@@ -1440,9 +1459,7 @@ pub fn prove_pulses_npp(
         //Check if the runner saturated or found an NPP
         let dont_continue = match &runner.stop_reason.as_ref().unwrap() {
             StopReason::Saturated => true,
-            StopReason::Other(stop) => {
-                stop.contains("Impossible")
-            }
+            StopReason::Other(stop) => stop.contains("Impossible"),
             _ => false,
         };
 
@@ -1468,7 +1485,7 @@ pub fn prove_pulses_npp(
         best_expr = Some(goals[proved_goal_index].to_string());
     } else {
         //Extract the best expression and calculate the extraction time if we can't prove.
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let now = Instant::now();
         let (_, best_exprr) = extractor.find_best(id);
         let extraction_time = now.elapsed().as_secs_f32();
@@ -1534,7 +1551,7 @@ pub fn prove_npp(
     let runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
-    
+
     let best_expr;
     let mut total_time: f64 = 0.0;
 
@@ -1547,14 +1564,15 @@ pub fn prove_npp(
     }
     // Enable the use of the iterative check technique
     if use_iteration_check {
-        let (runner_temp, impo_time) = Runner::default()
-            .with_iter_limit(params.0)
-            .with_node_limit(params.1)
-            .with_time_limit(Duration::from_secs_f64(params.2))
-            .with_expr(&start)
-            .run_fast(rules, &goals, check_npp);
-        runner = runner_temp;
-        total_time += impo_time;
+        panic!("You are on the branch with new egg, `run_fast` is not available.");
+        // let (runner_temp, impo_time) = Runner::default()
+        //     .with_iter_limit(params.0)
+        //     .with_node_limit(params.1)
+        //     .with_time_limit(Duration::from_secs_f64(params.2))
+        //     .with_expr(&start)
+        //     .run_fast(rules, &goals, check_npp);
+        // runner = runner_temp;
+        // total_time += impo_time;
     } else {
         //Run simple ES.
         runner = Runner::default()
@@ -1588,7 +1606,7 @@ pub fn prove_npp(
         best_expr = Some(goals[proved_goal_index].to_string());
     } else {
         // If no goal was proved, then we need to extract the best expression
-        let mut extractor = Extractor::new(&runner.egraph, AstDepth);
+        let extractor = Extractor::new(&runner.egraph, AstDepth);
         let now = Instant::now();
         let (_, best_exprr) = extractor.find_best(id);
 
