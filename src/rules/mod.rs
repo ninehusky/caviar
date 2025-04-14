@@ -39,6 +39,27 @@ pub fn all_rules() -> Vec<Rewrite<Math, ConstantFold>> {
     .collect()
 }
 
+pub fn all_rules_no_cond() -> Vec<Rewrite<Math, ConstantFold>> {
+    vec![
+        add::add_no_cond(),
+        and::and_no_cond(),
+        andor::andor(),
+        div::div_no_cond(),
+        eq::eq_no_cond(),
+        ineq::ineq(),
+        lt::lt_no_cond(),
+        max::max(),
+        min::min_no_cond(),
+        modulo::modulo_no_cond(),
+        mul::mul(),
+        or::or(),
+        sub::sub()
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
 pub fn arith_rules() -> Vec<Rewrite<Math, ConstantFold>> {
     vec![
         add::add(),

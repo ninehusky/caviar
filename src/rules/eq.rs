@@ -20,3 +20,17 @@ pub fn eq() -> Vec<Rewrite> {
         rw!("Eq-min-c-neg"  ; "(== (min ?x ?c) 0)"   => "(== ?x 0)" if crate::trs::is_const_pos("?c")),
     ]
 }
+
+pub fn eq_no_cond() -> Vec<Rewrite> {
+    vec![
+        // Equality RULES
+        rw!("eq-comm"       ; "(== ?x ?y)"           => "(== ?y ?x)"),
+        rw!("eq-x-y-0"      ; "(== ?x ?y)"           => "(== (- ?x ?y) 0)"),
+        rw!("eq-swap"       ; "(== (+ ?x ?y) ?z)"    => "(== ?x (- ?z ?y))"),
+        rw!("eq-x-x"        ; "(== ?x ?x)"           => "1"),
+        rw!("eq-mul-x-y-0"  ; "(== (* ?x ?y) 0)"     => "(|| (== ?x 0) (== ?y 0))"),
+        rw!("eq-max-lt"     ; "( == (max ?x ?y) ?y)" => "(<= ?x ?y)"),
+        rw!("Eq-min-lt"     ; "( == (min ?x ?y) ?y)" => "(<= ?y ?x)"),
+        rw!("Eq-lt-min"     ; "(<= ?y ?x)"           => "( == (min ?x ?y) ?y)"),
+    ]
+}

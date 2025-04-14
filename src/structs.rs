@@ -15,6 +15,7 @@ use crate::trs::{compare_c0_c1_chompy, ConstantFold, Math};
 pub enum RulesetTag {
     Custom(String),
     CaviarAll,
+    CaviarOnlyTotal,
     CaviarOnlyArith,
 }
 
@@ -46,6 +47,7 @@ impl Ruleset {
                 read_custom_rules(&file_path).unwrap()
             }
             RulesetTag::CaviarAll => crate::rules::all_rules(),
+            RulesetTag::CaviarOnlyTotal => crate::rules::all_rules_no_cond(),
             RulesetTag::CaviarOnlyArith => crate::rules::arith_rules(),
         }
     }
@@ -56,6 +58,7 @@ impl ToString for Ruleset {
         match &self.tag {
             RulesetTag::Custom(s) => s.to_string(),
             RulesetTag::CaviarAll => "CaviarAll".to_string(),
+            RulesetTag::CaviarOnlyTotal => "CaviarOnlyTotal".to_string(),
             RulesetTag::CaviarOnlyArith => "CaviarOnlyArith".to_string(),
         }
     }
@@ -63,7 +66,7 @@ impl ToString for Ruleset {
 
 impl From<i8> for Ruleset {
     fn from(value: i8) -> Self {
-        // Observe that you can't construct a `ProvingRules::Custom` ruleset from this: this is purely
+        // Observe that you can't construct a custom ruleset from this: this is purely
         // to work with the csvs that exist in the Caviar eval.
         match value {
             0 => Self::new(RulesetTag::CaviarOnlyArith),

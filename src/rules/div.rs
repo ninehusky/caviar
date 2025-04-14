@@ -18,3 +18,14 @@ pub fn div() -> Vec<Rewrite> {
         rw!("div-separate"  ; "( / ( + ?x ?a ) ?b )" => "( + ( / ?x ?b ) ( / ?a ?b ) )" if crate::trs::compare_c0_c1("?a", "?b", "%0<")),
     ]
 }
+
+pub fn div_no_cond() -> Vec<Rewrite> {
+    vec![
+        //DIV RULES
+        rw!("div-zero"      ; "(/ 0 ?x)"            => "(0)"),
+        rw!("div-minus-down"; "(/ (* -1 ?a) ?b)"    => "(/ ?a (* -1 ?b))"),
+        rw!("div-minus-up"  ; "(/ ?a (* -1 ?b))"    => "(/ (* -1 ?a) ?b)"),
+        rw!("div-minus-in"  ; "(* -1 (/ ?a ?b))"    => "(/ (* -1 ?a) ?b)"),
+        rw!("div-minus-out" ; "(/ (* -1 ?a) ?b)"    => "(* -1 (/ ?a ?b))"),
+    ]
+}

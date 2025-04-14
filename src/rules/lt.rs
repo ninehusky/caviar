@@ -30,3 +30,18 @@ pub fn lt() -> Vec<Rewrite> {
         rw!("lt-const-mod-false"     ; "(< ?a (% ?x ?b))" => "0"  if crate::trs::compare_c0_c1("?a", "?b", ">=a")),
     ]
 }
+
+pub fn lt_no_cond() -> Vec<Rewrite> {
+    vec![
+        // LT RULES
+        rw!("gt-to-lt"      ;  "(> ?x ?z)"              => "(< ?z ?x)"),
+        rw!("lt-swap"      ;  "(< ?x ?y)"              => "(< (* -1 ?y) (* -1 ?x))"),
+        rw!("lt-to-zero"    ;  "(< ?a ?a)"              => "0"),
+        rw!("lt-swap-in"    ;  "(< (+ ?x ?y) ?z)"       => "(< ?x (- ?z ?y))" ),
+        rw!("lt-swap-out"   ;  "(< ?z (+ ?x ?y))"       => "(< (- ?z ?y) ?x)" ),
+        rw!("min-lt-cancel" ;  "( < ( min ?x ?y ) ?x )" => "( < ?y ?x )"),
+        rw!("lt-min-mutual-term"    ; "( < ( min ?z ?y ) ( min ?x ?y ) )"           => "( < ?z ( min ?x ?y ) )"),
+        rw!("lt-max-mutual-term"    ; "( < ( max ?z ?y ) ( max ?x ?y ) )"           => "( < ( max ?z ?y ) ?x )"),
+        rw!("lt-min-max-cancel"     ; "(< (max ?a ?c) (min ?a ?b))"                 => "0"),
+    ]
+}

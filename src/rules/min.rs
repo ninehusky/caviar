@@ -41,3 +41,20 @@ pub fn min() -> Vec<Rewrite> {
         rw!("min-min-div-neg"        ; "( min ( * ?x ?a ) ( * ?y ?b ) )" => "( * ( max ?x ( * ?y ( / ?b ?a ) ) ) ?a )" if crate::trs::compare_c0_c1("?b", "?a", "%0>") ), 
     ]
 }
+
+pub fn min_no_cond() -> Vec<Rewrite> {
+    vec![
+        // MIN RULES
+        rw!("min-comm"      ; "(min ?a ?b)"                         => "(min ?b ?a)"),
+        rw!("min-ass"       ; "(min (min ?x ?y) ?z)"                => "(min ?x (min ?y ?z))"),
+        rw!("min-x-x"       ; "(min ?x ?x)"                         => "?x"),
+        rw!("min-max"       ; "(min (max ?x ?y) ?x)"                => "?x"),
+        rw!("min-max-max-x" ; "(min (max ?x ?y) (max ?x ?z))"       => "(max (min ?y ?z) ?x)"),
+        rw!("min-max-min-y" ; "(min (max (min ?x ?y) ?z) ?y)"       => "(min (max ?x ?z) ?y)"),
+        rw!("min-sub-both"  ; "(min (+ ?a ?b) ?c)"                  => "(+ (min ?b (- ?c ?a)) ?a)"),
+        rw!("min-add-both"  ; "(+ (min ?x ?y) ?z)"                  => "(min (+ ?x ?z) (+ ?y ?z))"),
+        rw!("min-consts-or"          ; "( < ( min ?y ?c0 ) ?c1 )" => "( || ( < ?y ?c1 ) ( < ?c0 ?c1 ) )"),
+        rw!("max-consts-and"         ; "( < ( max ?y ?c0 ) ?c1 )" => "( && ( < ?y ?c1 ) ( < ?c0 ?c1 ) )"),
+        rw!("max-consts-or"          ; "( < ?c1 ( max ?y ?c0 ) )" => "( || ( < ?c1 ?y ) ( < ?c1 ?c0 ) )"),
+    ]
+}
