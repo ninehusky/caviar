@@ -18,6 +18,8 @@ fn main() {
         if args.iter().last().unwrap() == "--use_chompy_rules" {
             println!("we're gonna use chompy rules.");
             Ruleset::new(RulesetTag::Custom("chompy-rules.txt".to_string()))
+        } else if args.iter().last().unwrap() == "--only-total" {
+            Ruleset::new(RulesetTag::CaviarOnlyTotal)
         } else {
             Ruleset::new(RulesetTag::CaviarAll)
         }
