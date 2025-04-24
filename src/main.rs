@@ -73,9 +73,8 @@ fn main() {
             // Prove expressions using Caviar with/without ILC
             "prove" => {
                 let expression_vect = read_expressions(&expressions_file).unwrap();
-                // hacky
-
-                let results = prove_expressions(&expression_vect, &ruleset, params, true, false);
+                // use_iteration_check must be false on this branch
+                let results = prove_expressions(&expression_vect, &ruleset, params, false, false);
                 write_results("tmp/results_prove.csv", &results).unwrap();
             }
             // Prove expressions using Caviar with pulses and with/without ILC.

@@ -11,7 +11,8 @@ pub mod structs;
 pub mod trs;
 
 use trs::{
-    prove, prove_expression_with_file_classes, prove_npp, prove_pulses, prove_pulses_npp, simplify,
+    prove_expression_with_file_classes, prove_npp, prove_pulses, prove_pulses_npp,
+    prove_with_explanation, simplify,
 };
 
 /// Runs Simple Caviar to prove the expressions passed as vector using the different params passed. #[allow(dead_code)]
@@ -30,7 +31,7 @@ pub fn prove_expressions(
     //For each expression try to prove it then push the results into the results vector.
     for expression in exprs_vect.iter() {
         println!("Starting Expression: {}", expression.index);
-        let mut res = prove(
+        let (mut res, explanation) = prove_with_explanation(
             expression.index,
             &expression.expression,
             ruleset,
@@ -39,6 +40,7 @@ pub fn prove_expressions(
             report,
         );
         res.add_halide(expression.halide_result.clone(), expression.halide_time);
+        println!("explanation: {:?}", explanation);
         println!("result: {:?}", res.stop_reason);
         results.push(res);
     }
