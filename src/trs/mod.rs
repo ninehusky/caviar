@@ -325,7 +325,7 @@ pub fn is_true(prog: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
                                 "*" => {
                                     let val1 = children[0].unwrap();
                                     let val2 = children[1].unwrap();
-                                    val2.checked_mul(val2)
+                                    val1.checked_mul(val2)
                                 }
                                 "/" => {
                                     let val1 = children[0].unwrap();
@@ -404,6 +404,32 @@ pub fn is_true(prog: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
         let val = interpret_me(sexp.clone(), egraph, id, subst);
         val.is_some() && val.unwrap() != 0
     }
+}
+
+#[test]
+fn is_true_actually_ok() {
+    // these rules are unsound, but they're only to test if `is_true` actually fires.
+    // (writing sound rules here means that `ConstantFold` by itself will be able
+    // to prove the goal, and we won't be able to test `is_true`.)
+    let rules: Vec<Rewrite> = vec![
+        rewrite!("for-fun"; "(min ?x ?y)" => "(+ z 1)" if is_true("(== ?x (/ 4 2))")),
+        rewrite!("z-fun"; "(+ z 1)" => "result" if is_true("(== 2 (* (+ 1 1) 1))"))
+    ];
+
+    let mut egraph = EGraph::default();
+
+    let mut runner: Runner<Math, ConstantFold> = Runner::default()
+        .with_expr(&"(min 2 y)".parse().unwrap())
+        .with_iter_limit(100)
+        .with_node_limit(100)
+        .with_time_limit(Duration::from_secs_f64(10.0))
+        .run(&rules);
+
+    let id = runner.egraph.find(*runner.roots.last().unwrap());
+    let mut extractor = Extractor::new(&runner.egraph, AstSize);
+    let (cost, best_expr) = extractor.find_best(id);
+    assert_eq!(best_expr.to_string(), "result");
+    assert_eq!(cost, 1);
 }
 
 /// Eventually, we'll port this to the general `compare_c0_c1`, but we

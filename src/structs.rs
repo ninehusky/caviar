@@ -84,24 +84,6 @@ fn read_custom_rules(
     println!("Reading rules from {}", file_path.to_str().unwrap());
     pub fn make_cond(cond: &str) -> impl Condition<Math, ConstantFold> {
         is_true(cond)
-        // let cond_ast: Sexp = parse(cond).unwrap();
-
-
-        // let (cond, e1, e2) = match cond_ast {
-        //     Sexp::Atom(_) => panic!("expected a list"),
-        //     Sexp::List(l) => {
-        //         if l.len() != 3 {
-        //             panic!("expected a list of length 3");
-        //         }
-        //         (
-        //             l[0].clone().to_string(),
-        //             l[1].clone().to_string(),
-        //             l[2].clone().to_string(),
-        //         )
-        //     }
-        // };
-
-        // compare_c0_c1_chompy(e1.as_str(), e2.as_str(), cond.as_str())
     }
 
     pub fn from_string(
