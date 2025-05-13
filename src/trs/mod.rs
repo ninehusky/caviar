@@ -1,6 +1,7 @@
 use crate::structs::{ResultStructure, Rule, Ruleset, RulesetTag};
 
 use json::JsonValue;
+use sexp::{parse, Sexp};
 use std::error::Error;
 use std::time::Duration;
 use std::{cmp::Ordering, time::Instant};
@@ -204,6 +205,231 @@ pub fn is_not_zero(var: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
     let zero = Math::Constant(0);
     // Check if any of the representations of the constant (nodes inside its eclass) is zero
     move |egraph, _, subst| !egraph[subst[var]].nodes.contains(&zero)
+}
+
+/// Generic condition handler. Takes in a program and returns if the e-graph
+/// has figured out if it should hold. It is sound, but not complete.
+/// (i.e., `is_true === true` means that the condition is definitely true,
+/// but `is_true === false` does not mean that the condition is definitely false.)
+pub fn is_true(prog: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
+    let sexp: Sexp = parse(prog).unwrap();
+
+    fn interpret_me(
+        sexp: Sexp,
+        egraph: &mut egg::EGraph<Math, ConstantFold>,
+        id: Id,
+        subst: &Subst,
+    ) -> Option<i64> {
+        match sexp {
+            Sexp::Atom(a) => {
+                // if it's a literal, return it
+                if let Ok(num) = a.to_string().parse::<i64>() {
+                    return Some(num);
+                }
+                // if it's a variable, return it
+                let v: Var = a.to_string().parse().unwrap();
+                if egraph[subst[v]].data.is_some() {
+                    // See #12 -- is this different from what they do (they iterate through egraph[subst[v]].nodes and try to find a Constant)?
+                    // if it is, why?
+                    return Some(egraph[subst[v]].data.unwrap());
+                } else {
+                    return None;
+                }
+            }
+            Sexp::List(ref l) => {
+                // l[0] better be the operator.
+                if let Sexp::Atom(a) = &l[0] {
+                    let operand = a.to_string();
+
+                    let children = l[1..]
+                        .iter()
+                        .map(|x| interpret_me(x.clone(), egraph, id, subst))
+                        .collect::<Vec<_>>();
+
+                    if children.iter().any(|x| x.is_none()) {
+                        return None;
+                    }
+
+                    match children.len() {
+                        1 => {
+                            match operand.as_str() {
+                                "!" => {
+                                    // this is safe because of the check above which returns None if any of the children are None
+                                    let val = children[0].unwrap();
+                                    Some(if val == 0 { 1 } else { 0 })
+                                },
+                                "abs" => {
+                                    let val = children[0].unwrap();
+                                    Some(val.abs())
+                                },
+                                _ => panic!("Unary operator {} not supported", operand),
+                            }
+                        },
+                        2 => {
+                            match operand.as_str() {
+                                "<" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(if val1 < val2 { 1 } else { 0 })
+                                }
+                                "<=" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(if val1 <= val2 { 1 } else { 0 })
+                                }
+                                ">" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(if val1 > val2 { 1 } else { 0 })
+                                }
+                                ">=" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(if val1 >= val2 { 1 } else { 0 })
+                                }
+                                "==" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(if val1 == val2 { 1 } else { 0 })
+                                }
+                                "!=" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(if val1 != val2 { 1 } else { 0 })
+                                }
+                                "-" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    val1.checked_sub(val2)
+                                }
+                                "&&" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(if val1 != 0 && val2 != 0 { 1 } else { 0 })
+                                }
+                                "||" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(if val1 != 0 || val2 != 0 { 1 } else { 0 })
+                                }
+                                "^" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    Some(val1 ^ val2)
+                                }
+                                "+" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    val1.checked_add(val2)
+                                }
+                                "*" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    val1.checked_mul(val2)
+                                }
+                                "/" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    if val2 == 0 {
+                                        Some(0)
+                                    } else {
+                                        let is_neg = (val1 < 0) ^ (val2 < 0);
+                                        if is_neg {
+                                            val1.abs().checked_div(val2.abs()).map(|v| -v)
+                                        } else {
+                                            val1.checked_div(val2)
+                                        }
+                                    }
+                                }
+                                "%" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    if val2 == 0 {
+                                        Some(0)
+                                    } else {
+                                        let is_neg = (val1 < 0) ^ (val2 < 0);
+                                        if is_neg {
+                                            val1.abs().checked_rem(val2.abs()).map(|v| -v)
+                                        } else {
+                                            val1.checked_rem(val2)
+                                        }
+                                    }
+                                }
+                                "min" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    if val1 < val2 {
+                                        Some(val1)
+                                    } else {
+                                        Some(val2)
+                                    }
+                                }
+                                "max" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    if val1 > val2 {
+                                        Some(val1)
+                                    } else {
+                                        Some(val2)
+                                    }
+                                }
+                                _ => panic!("Binary operator {} not supported", operand),
+                            }
+                        },
+                        3 => {
+                            match operand.as_str() {
+                                "select" => {
+                                    let val1 = children[0].unwrap();
+                                    let val2 = children[1].unwrap();
+                                    let val3 = children[2].unwrap();
+                                    if val1 == 0 {
+                                        Some(val2)
+                                    } else {
+                                        Some(val3)
+                                    }
+                                }
+                                _ => panic!("Ternary operator {} not supported", operand),
+                            }
+                        }
+                        _ => panic!("Sexp given: {}", sexp),
+                    }
+                } else {
+                    panic!();
+                }
+            }
+        }
+    }
+
+    move |egraph, id, subst| {
+        let val = interpret_me(sexp.clone(), egraph, id, subst);
+        val.is_some() && val.unwrap() != 0
+    }
+}
+
+#[test]
+fn is_true_actually_ok() {
+    // these rules are unsound, but they're only to test if `is_true` actually fires.
+    // (writing sound rules here means that `ConstantFold` by itself will be able
+    // to prove the goal, and we won't be able to test `is_true`.)
+    let rules: Vec<Rewrite> = vec![
+        rewrite!("for-fun"; "(min ?x ?y)" => "(+ z 1)" if is_true("(== ?x (/ 4 2))")),
+        rewrite!("z-fun"; "(+ z 1)" => "result" if is_true("(== 2 (* (+ 1 1) 1))"))
+    ];
+
+    let mut egraph = EGraph::default();
+
+    let mut runner: Runner<Math, ConstantFold> = Runner::default()
+        .with_expr(&"(min 2 y)".parse().unwrap())
+        .with_iter_limit(100)
+        .with_node_limit(100)
+        .with_time_limit(Duration::from_secs_f64(10.0))
+        .run(&rules);
+
+    let id = runner.egraph.find(*runner.roots.last().unwrap());
+    let mut extractor = Extractor::new(&runner.egraph, AstSize);
+    let (cost, best_expr) = extractor.find_best(id);
+    assert_eq!(best_expr.to_string(), "result");
+    assert_eq!(cost, 1);
 }
 
 /// Eventually, we'll port this to the general `compare_c0_c1`, but we
@@ -521,7 +747,7 @@ pub fn prove(
     let runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
-    
+
     let best_expr;
 
     if report {
@@ -657,7 +883,7 @@ pub fn prove_expression_with_file_classes(
     let mut runner: egg::Runner<Math, ConstantFold>;
     let mut rules: Vec<Rewrite>;
     let mut proved_goal_index = 0;
-    
+
     let mut best_expr = Some("".to_string());
     let mut proving_class = -1;
     // First iteration of the runner.
@@ -1440,9 +1666,7 @@ pub fn prove_pulses_npp(
         //Check if the runner saturated or found an NPP
         let dont_continue = match &runner.stop_reason.as_ref().unwrap() {
             StopReason::Saturated => true,
-            StopReason::Other(stop) => {
-                stop.contains("Impossible")
-            }
+            StopReason::Other(stop) => stop.contains("Impossible"),
             _ => false,
         };
 
@@ -1534,7 +1758,7 @@ pub fn prove_npp(
     let runner: Runner<Math, ConstantFold>;
     let mut result = false;
     let mut proved_goal_index = 0;
-    
+
     let best_expr;
     let mut total_time: f64 = 0.0;
 
